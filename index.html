@@ -435,6 +435,31 @@ async function getOrCreatePeriodo() {
   return nuevo?.id;
 }
 
+async function getOrCreatePeriodoFromDate(anio, mes) {
+  if (!state.empresaId) return null;
+  const { data: existing } = await sb.from('periodos').select('id').eq('empresa_id', state.empresaId).eq('anio', anio).eq('mes', mes).single();
+  if (existing) return existing.id;
+  const { data: nuevo } = await sb.from('periodos').insert({ empresa_id: state.empresaId, anio, mes }).select('id').single();
+  return nuevo?.id;
+}
+
+// Detecta el mes/año predominante en un array de documentos
+function detectarPeriodo(docs) {
+  const conteo = {};
+  docs.forEach(d => {
+    if (!d.fecha_docto) return;
+    const parts = d.fecha_docto.split('-');
+    if (parts.length < 2) return;
+    const key = `${parts[0]}-${parts[1]}`;
+    conteo[key] = (conteo[key] || 0) + 1;
+  });
+  const keys = Object.keys(conteo);
+  if (!keys.length) return null;
+  keys.sort((a,b) => conteo[b] - conteo[a]);
+  const [anio, mes] = keys[0].split('-');
+  return { anio: parseInt(anio), mes: parseInt(mes) };
+}
+
 // ─── DASHBOARD ────────────────────────────────────────────────────
 async function renderDashboard() {
   const el = document.getElementById('page-dashboard');
@@ -808,7 +833,22 @@ async function processRCV(file, tipoMov) {
     return;
   }
 
-  const periodoId = await getOrCreatePeriodo();
+  // Detectar período automáticamente desde las fechas del archivo
+  const periodoDetectado = detectarPeriodo(docs);
+  let periodoId;
+  let periodoLabel = getPeriodoLabel();
+  if (periodoDetectado) {
+    periodoId = await getOrCreatePeriodoFromDate(periodoDetectado.anio, periodoDetectado.mes);
+    const meses = ['','Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+    periodoLabel = `${meses[periodoDetectado.mes]} ${periodoDetectado.anio}`;
+    // Actualizar selector de período en la UI
+    document.getElementById('month-select').value = periodoDetectado.mes;
+    document.getElementById('year-select').value = periodoDetectado.anio;
+    state.mes = periodoDetectado.mes;
+    state.anio = periodoDetectado.anio;
+  } else {
+    periodoId = await getOrCreatePeriodo();
+  }
   // Eliminar los del mismo periodo y tipo antes de insertar
   await sb.from('rcv_documentos').delete().eq('empresa_id', state.empresaId).eq('periodo_id', periodoId).eq('tipo_mov', tipoMov);
 
@@ -827,7 +867,7 @@ async function processRCV(file, tipoMov) {
   const totalIVA = docs.reduce((s, d) => s + d.iva, 0);
   const totalGeneral = docs.reduce((s, d) => s + d.monto_total, 0);
 
-  statusEl.innerHTML = `<div class="alert alert-success">✓ ${docs.length} documentos de ${tipoMov === 'compra' ? 'compras' : 'ventas'} importados — ${getPeriodoLabel()}</div>`;
+  statusEl.innerHTML = `<div class="alert alert-success">✓ ${docs.length} documentos de ${tipoMov === 'compra' ? 'compras' : 'ventas'} importados — <strong>${periodoLabel}</strong>${periodoDetectado ? ' (detectado automáticamente)' : ''}</div>`;
   previewEl.innerHTML = `
     <div class="card">
       <div class="card-header">
