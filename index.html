@@ -236,6 +236,14 @@ tr:hover td { background: var(--bg); }
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
         Est. Resultados
       </a>
+      <a class="nav-item" onclick="navigate('historial')" href="#">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        Historial
+      </a>
+      <a class="nav-item" onclick="navigate('consultor')" href="#">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        Consultor IA
+      </a>
       <div class="nav-section">Config</div>
       <a class="nav-item" onclick="navigate('empresas')" href="#">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>
@@ -282,6 +290,8 @@ tr:hover td { background: var(--bg); }
       <div id="page-f29" class="tab-panel"></div>
       <div id="page-balance" class="tab-panel"></div>
       <div id="page-eerr" class="tab-panel"></div>
+      <div id="page-historial" class="tab-panel"></div>
+      <div id="page-consultor" class="tab-panel"></div>
     </div>
   </div>
 </div>
@@ -376,7 +386,8 @@ function navigate(page) {
     'importar-rcv':'Importar RCV','importar-honorarios':'Importar honorarios',
     'importar-banco':'Importar cartola bancaria','asientos':'Asiento manual',
     'libro-diario':'Libro diario','libro-mayor':'Libro mayor',
-    'f29':'Formulario 29','balance':'Balance 8 columnas','eerr':'Estado de resultados'
+    'f29':'Formulario 29','balance':'Balance 8 columnas','eerr':'Estado de resultados',
+    'historial':'Historial de documentos','consultor':'Consultor IA'
   };
   document.getElementById('page-title').textContent = titles[page] || page;
   const renders = {
@@ -385,7 +396,8 @@ function navigate(page) {
     'importar-honorarios': renderImportarHonorarios, 'importar-banco': renderImportarBanco,
     'asientos': renderAsientos, 'libro-diario': renderLibroDiario,
     'libro-mayor': renderLibroMayor, 'f29': renderF29,
-    'balance': renderBalance, 'eerr': renderEERR
+    'balance': renderBalance, 'eerr': renderEERR,
+    'historial': renderHistorial, 'consultor': renderConsultor
   };
   if (renders[page]) renders[page]();
 }
@@ -1566,6 +1578,222 @@ function showModal(title, body, onSave) {
 }
 function closeModal() { document.getElementById('modal-overlay').classList.add('hidden'); }
 function closeModalOverlay(e) { if (e.target === document.getElementById('modal-overlay')) closeModal(); }
+
+// ─── HISTORIAL ────────────────────────────────────────────────────
+async function renderHistorial() {
+  const el = document.getElementById('page-historial');
+  if (!requireEmpresa(el)) return;
+  el.innerHTML = `<div class="loading"><div class="spinner"></div> Cargando historial...</div>`;
+
+  const { data: periodos } = await sb.from('periodos').select('*').eq('empresa_id', state.empresaId).order('anio', { ascending: false }).order('mes', { ascending: false });
+
+  if (!periodos?.length) {
+    el.innerHTML = `<div class="alert alert-info">No hay períodos registrados para esta empresa aún.</div>`;
+    return;
+  }
+
+  const meses = ['','Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+
+  let html = `<div class="mb16" style="font-size:13px;color:var(--text2)">${periodos.length} períodos registrados — ${state.empresaNombre}</div>`;
+
+  for (const p of periodos) {
+    const { data: rcvCompras } = await sb.from('rcv_documentos').select('monto_neto, iva, monto_total').eq('periodo_id', p.id).eq('tipo_mov', 'compra');
+    const { data: rcvVentas } = await sb.from('rcv_documentos').select('monto_neto, iva, monto_total').eq('periodo_id', p.id).eq('tipo_mov', 'venta');
+    const { data: hons } = await sb.from('honorarios').select('monto_bruto, retencion').eq('periodo_id', p.id);
+    const { data: asientos } = await sb.from('asientos').select('id').eq('periodo_id', p.id);
+
+    const totalCompras = (rcvCompras||[]).reduce((s,r) => s + r.monto_total, 0);
+    const totalVentas = (rcvVentas||[]).reduce((s,r) => s + r.monto_total, 0);
+    const totalHon = (hons||[]).reduce((s,r) => s + r.monto_bruto, 0);
+    const ivaDebito = (rcvVentas||[]).reduce((s,r) => s + r.iva, 0);
+    const ivaCredito = (rcvCompras||[]).reduce((s,r) => s + r.iva, 0);
+
+    html += `
+    <div class="card mb16">
+      <div class="card-header">
+        <span class="card-title">${meses[p.mes]} ${p.anio}</span>
+        <div class="flex gap8">
+          <span class="badge badge-blue">${(rcvCompras||[]).length} compras</span>
+          <span class="badge badge-green">${(rcvVentas||[]).length} ventas</span>
+          ${hons?.length ? `<span class="badge badge-amber">${hons.length} honorarios</span>` : ''}
+          <button class="btn btn-sm" onclick="exportarPeriodo('${p.id}','${meses[p.mes]} ${p.anio}')">Exportar CSV</button>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="grid4">
+          <div class="metric"><div class="metric-label">Ventas totales</div><div class="metric-value green" style="font-size:16px">${clp(totalVentas)}</div></div>
+          <div class="metric"><div class="metric-label">Compras totales</div><div class="metric-value" style="font-size:16px">${clp(totalCompras)}</div></div>
+          <div class="metric"><div class="metric-label">Honorarios</div><div class="metric-value" style="font-size:16px">${clp(totalHon)}</div></div>
+          <div class="metric"><div class="metric-label">IVA neto F29</div><div class="metric-value ${ivaDebito-ivaCredito>0?'red':'green'}" style="font-size:16px">${clp(Math.abs(ivaDebito-ivaCredito))}</div></div>
+        </div>
+      </div>
+    </div>`;
+  }
+
+  el.innerHTML = html;
+}
+
+async function exportarPeriodo(periodoId, label) {
+  const { data: compras } = await sb.from('rcv_documentos').select('*').eq('periodo_id', periodoId).eq('tipo_mov', 'compra');
+  const { data: ventas } = await sb.from('rcv_documentos').select('*').eq('periodo_id', periodoId).eq('tipo_mov', 'venta');
+  const { data: hons } = await sb.from('honorarios').select('*').eq('periodo_id', periodoId);
+
+  let csv = 'Tipo,Fecha,RUT,Nombre/Proveedor,Neto,IVA,Total\n';
+  (ventas||[]).forEach(r => csv += `Venta,${r.fecha_docto||''},${r.rut_contraparte||''},"${r.razon_contraparte||''}",${r.monto_neto},${r.iva},${r.monto_total}\n`);
+  (compras||[]).forEach(r => csv += `Compra,${r.fecha_docto||''},${r.rut_contraparte||''},"${r.razon_contraparte||''}",${r.monto_neto},${r.iva},${r.monto_total}\n`);
+  (hons||[]).forEach(h => csv += `Honorario,,${h.rut_trabajador||''},"${h.nombre_trabajador||''}",${h.monto_bruto},${h.retencion},${h.monto_liquido}\n`);
+
+  const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `respaldo_${label.replace(/ /g,'_')}.csv`;
+  a.click();
+}
+
+// ─── CONSULTOR IA ─────────────────────────────────────────────────
+const ANTHROPIC_KEY = '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';
+let chatHistory = [];
+
+function renderConsultor() {
+  const el = document.getElementById('page-consultor');
+  el.innerHTML = `
+    <div style="max-width:720px">
+      <div class="alert alert-info mb16">
+        Hazle preguntas a tus datos contables en español. Ejemplos: "¿Cuánto compré en mayo?", "¿Cuál es mi IVA del primer semestre?", "¿Qué proveedor me facturó más?"
+      </div>
+      <div class="card" style="margin-bottom:16px">
+        <div id="chat-messages" style="min-height:300px;max-height:500px;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:12px">
+          <div style="text-align:center;color:var(--text3);font-size:13px;padding:40px 0">
+            Escribe tu primera pregunta abajo
+          </div>
+        </div>
+      </div>
+      <div class="flex gap8">
+        <input class="form-input" id="chat-input" placeholder="Ej: ¿Cuánto fue mi IVA a pagar en mayo 2026?" 
+          onkeydown="if(event.key==='Enter' && !event.shiftKey){event.preventDefault();sendChat()}"
+          style="flex:1">
+        <button class="btn btn-primary" onclick="sendChat()" id="chat-send-btn">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+          Enviar
+        </button>
+        <button class="btn" onclick="chatHistory=[];renderConsultor()" title="Nueva conversación">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.51"/></svg>
+        </button>
+      </div>
+    </div>`;
+}
+
+async function sendChat() {
+  const input = document.getElementById('chat-input');
+  const msg = input.value.trim();
+  if (!msg) return;
+
+  input.value = '';
+  document.getElementById('chat-send-btn').disabled = true;
+
+  appendChatMsg('user', msg);
+  appendChatMsg('assistant', '...', 'thinking');
+
+  // Recopilar contexto de datos
+  let contexto = `Eres un contador experto chileno. Tienes acceso a los datos contables de la empresa "${state.empresaNombre}". `;
+
+  if (state.empresaId) {
+    try {
+      const { data: periodos } = await sb.from('periodos').select('anio, mes').eq('empresa_id', state.empresaId).order('anio').order('mes');
+      const meses = ['','Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+      const periodosStr = (periodos||[]).map(p => `${meses[p.mes]}${p.anio}`).join(', ');
+      contexto += `Períodos con datos: ${periodosStr}. `;
+
+      // Datos del período actual
+      const periodoId = await getPeriodoIdSilent();
+      if (periodoId) {
+        const { data: ventas } = await sb.from('rcv_documentos').select('rut_contraparte, razon_contraparte, monto_neto, iva, monto_total, fecha_docto').eq('empresa_id', state.empresaId).eq('periodo_id', periodoId).eq('tipo_mov', 'venta');
+        const { data: compras } = await sb.from('rcv_documentos').select('rut_contraparte, razon_contraparte, monto_neto, iva, monto_total, fecha_docto').eq('empresa_id', state.empresaId).eq('periodo_id', periodoId).eq('tipo_mov', 'compra');
+        const { data: hons } = await sb.from('honorarios').select('nombre_trabajador, monto_bruto, retencion').eq('empresa_id', state.empresaId).eq('periodo_id', periodoId);
+
+        const tvNeto = (ventas||[]).reduce((s,r)=>s+r.monto_neto,0);
+        const tvIva = (ventas||[]).reduce((s,r)=>s+r.iva,0);
+        const tcNeto = (compras||[]).reduce((s,r)=>s+r.monto_neto,0);
+        const tcIva = (compras||[]).reduce((s,r)=>s+r.iva,0);
+        const thBruto = (hons||[]).reduce((s,h)=>s+h.monto_bruto,0);
+        const thRet = (hons||[]).reduce((s,h)=>s+h.retencion,0);
+
+        const emp = state.empresas.find(e => e.id === state.empresaId);
+        const ppm = Math.round(tvNeto * (emp?.tasa_ppm||0.25) / 100);
+
+        contexto += `\n\nDatos período seleccionado (${getPeriodoLabel()}):
+VENTAS: ${(ventas||[]).length} facturas, neto $${Math.round(tvNeto).toLocaleString('es-CL')}, IVA débito $${Math.round(tvIva).toLocaleString('es-CL')}
+COMPRAS: ${(compras||[]).length} facturas, neto $${Math.round(tcNeto).toLocaleString('es-CL')}, IVA crédito $${Math.round(tcIva).toLocaleString('es-CL')}
+HONORARIOS: ${(hons||[]).length} boletas, bruto $${Math.round(thBruto).toLocaleString('es-CL')}, retención $${Math.round(thRet).toLocaleString('es-CL')}
+IVA A PAGAR F29: $${Math.round(Math.max(0,tvIva-tcIva)).toLocaleString('es-CL')}
+PPM: $${ppm.toLocaleString('es-CL')}
+TOTAL F29: $${Math.round(Math.max(0,tvIva-tcIva)+ppm-thRet).toLocaleString('es-CL')}`;
+
+        if (ventas?.length) {
+          contexto += `\n\nDetalle ventas: ${ventas.slice(0,10).map(v=>`${v.razon_contraparte} $${Math.round(v.monto_total).toLocaleString('es-CL')}`).join('; ')}`;
+        }
+        if (compras?.length) {
+          contexto += `\n\nDetalle compras: ${compras.slice(0,10).map(c=>`${c.razon_contraparte} $${Math.round(c.monto_total).toLocaleString('es-CL')}`).join('; ')}`;
+        }
+      }
+    } catch(e) {}
+  }
+
+  chatHistory.push({ role: 'user', content: msg });
+
+  try {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': ANTHROPIC_KEY,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 1000,
+        system: contexto,
+        messages: chatHistory
+      })
+    });
+
+    const data = await response.json();
+    const reply = data.content?.[0]?.text || 'No pude obtener respuesta.';
+    chatHistory.push({ role: 'assistant', content: reply });
+    updateThinkingMsg(reply);
+  } catch(e) {
+    updateThinkingMsg(`Error: ${e.message}`);
+  }
+
+  document.getElementById('chat-send-btn').disabled = false;
+  document.getElementById('chat-input').focus();
+}
+
+function appendChatMsg(role, text, id) {
+  const msgs = document.getElementById('chat-messages');
+  // Clear placeholder
+  if (msgs.children.length === 1 && msgs.children[0].style.textAlign === 'center') {
+    msgs.innerHTML = '';
+  }
+  const div = document.createElement('div');
+  div.style.cssText = `display:flex;gap:10px;${role==='user'?'flex-direction:row-reverse':''}`;
+  if (id) div.id = 'msg-' + id;
+  const bubble = document.createElement('div');
+  bubble.style.cssText = `max-width:80%;padding:10px 14px;border-radius:12px;font-size:13px;line-height:1.6;white-space:pre-wrap;${role==='user'?'background:#2563eb;color:#fff;border-radius:12px 12px 2px 12px':'background:var(--surface-1);color:var(--text-primary);border:0.5px solid var(--border);border-radius:12px 12px 12px 2px'}`;
+  bubble.textContent = text;
+  div.appendChild(bubble);
+  msgs.appendChild(div);
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+function updateThinkingMsg(text) {
+  const el = document.getElementById('msg-thinking');
+  if (el) {
+    el.querySelector('div').textContent = text;
+    el.removeAttribute('id');
+  }
+}
 
 // ─── START ────────────────────────────────────────────────────────
 init();
