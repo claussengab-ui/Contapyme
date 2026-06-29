@@ -1,0 +1,1574 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Contabilidad Pyme</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<style>
+:root {
+  --bg: #f7f6f3;
+  --surface: #ffffff;
+  --surface2: #f0efe9;
+  --border: #e2e0d8;
+  --border2: #ccc9bc;
+  --text: #1a1917;
+  --text2: #6b6860;
+  --text3: #9b9890;
+  --accent: #2563eb;
+  --accent-bg: #eff6ff;
+  --accent-border: #bfdbfe;
+  --green: #16a34a;
+  --green-bg: #f0fdf4;
+  --red: #dc2626;
+  --red-bg: #fef2f2;
+  --amber: #d97706;
+  --amber-bg: #fffbeb;
+  --radius: 8px;
+  --shadow: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); font-size: 14px; line-height: 1.5; }
+
+/* Layout */
+.shell { display: flex; min-height: 100vh; }
+.sidebar { width: 220px; background: var(--surface); border-right: 1px solid var(--border); display: flex; flex-direction: column; flex-shrink: 0; position: fixed; top: 0; left: 0; bottom: 0; z-index: 10; }
+.main { margin-left: 220px; flex: 1; min-height: 100vh; }
+.topbar { background: var(--surface); border-bottom: 1px solid var(--border); padding: 0 24px; height: 52px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 5; }
+.page { padding: 24px; max-width: 1100px; }
+
+/* Sidebar */
+.sidebar-logo { padding: 16px; border-bottom: 1px solid var(--border); }
+.sidebar-logo span { font-size: 15px; font-weight: 600; color: var(--text); }
+.sidebar-logo small { display: block; font-size: 11px; color: var(--text3); margin-top: 1px; }
+.company-selector { padding: 10px 12px; border-bottom: 1px solid var(--border); }
+.company-selector select { width: 100%; font-size: 13px; padding: 6px 8px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg); color: var(--text); cursor: pointer; }
+.nav { padding: 8px 0; flex: 1; overflow-y: auto; }
+.nav-section { padding: 12px 14px 4px; font-size: 10px; font-weight: 600; color: var(--text3); letter-spacing: 0.08em; text-transform: uppercase; }
+.nav-item { display: flex; align-items: center; gap: 8px; padding: 7px 14px; font-size: 13px; color: var(--text2); cursor: pointer; border-radius: 0; transition: background 0.1s; text-decoration: none; }
+.nav-item:hover { background: var(--bg); color: var(--text); }
+.nav-item.active { background: var(--accent-bg); color: var(--accent); font-weight: 500; border-right: 2px solid var(--accent); }
+.nav-item svg { width: 16px; height: 16px; flex-shrink: 0; }
+
+/* Topbar */
+.page-title { font-size: 16px; font-weight: 600; color: var(--text); }
+.period-selector { display: flex; align-items: center; gap: 8px; }
+.period-selector select { font-size: 13px; padding: 5px 8px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg); color: var(--text); }
+
+/* Cards / Sections */
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; box-shadow: var(--shadow); }
+.card-header { padding: 14px 18px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+.card-title { font-size: 14px; font-weight: 600; }
+.card-body { padding: 18px; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+.grid4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+.mb16 { margin-bottom: 16px; }
+.mb24 { margin-bottom: 24px; }
+
+/* Metric cards */
+.metric { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 16px; box-shadow: var(--shadow); }
+.metric-label { font-size: 11px; color: var(--text3); font-weight: 500; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 6px; }
+.metric-value { font-size: 22px; font-weight: 600; color: var(--text); font-variant-numeric: tabular-nums; }
+.metric-value.green { color: var(--green); }
+.metric-value.red { color: var(--red); }
+.metric-sub { font-size: 11px; color: var(--text3); margin-top: 3px; }
+
+/* Buttons */
+.btn { display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px; font-size: 13px; font-weight: 500; border-radius: var(--radius); border: 1px solid var(--border2); background: var(--surface); color: var(--text); cursor: pointer; transition: background 0.1s; white-space: nowrap; }
+.btn:hover { background: var(--bg); }
+.btn-primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.btn-primary:hover { background: #1d4ed8; border-color: #1d4ed8; }
+.btn-sm { padding: 4px 10px; font-size: 12px; }
+.btn-danger { color: var(--red); border-color: #fca5a5; }
+.btn-danger:hover { background: var(--red-bg); }
+.btn svg { width: 14px; height: 14px; }
+
+/* Forms */
+.form-group { margin-bottom: 14px; }
+.form-label { display: block; font-size: 12px; font-weight: 500; color: var(--text2); margin-bottom: 5px; }
+.form-input { width: 100%; padding: 7px 10px; font-size: 13px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); color: var(--text); outline: none; }
+.form-input:focus { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-bg); }
+.form-select { width: 100%; padding: 7px 10px; font-size: 13px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); color: var(--text); outline: none; cursor: pointer; }
+.form-select:focus { border-color: var(--accent); }
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.form-row3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+
+/* Tables */
+.table-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th { background: var(--bg); padding: 8px 12px; text-align: left; font-size: 11px; font-weight: 600; color: var(--text2); text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1px solid var(--border); white-space: nowrap; }
+td { padding: 9px 12px; border-bottom: 1px solid var(--border); color: var(--text); vertical-align: middle; }
+tr:last-child td { border-bottom: none; }
+tr:hover td { background: var(--bg); }
+.td-num { text-align: right; font-variant-numeric: tabular-nums; font-family: 'SF Mono', monospace; }
+.td-muted { color: var(--text3); font-size: 12px; }
+
+/* Badges */
+.badge { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 500; }
+.badge-green { background: var(--green-bg); color: var(--green); }
+.badge-red { background: var(--red-bg); color: var(--red); }
+.badge-amber { background: var(--amber-bg); color: var(--amber); }
+.badge-blue { background: var(--accent-bg); color: var(--accent); }
+.badge-gray { background: var(--surface2); color: var(--text2); }
+
+/* Upload zone */
+.upload-zone { border: 2px dashed var(--border2); border-radius: 10px; padding: 32px; text-align: center; cursor: pointer; transition: border-color 0.15s, background 0.15s; }
+.upload-zone:hover, .upload-zone.drag { border-color: var(--accent); background: var(--accent-bg); }
+.upload-icon { width: 36px; height: 36px; margin: 0 auto 10px; color: var(--text3); }
+.upload-text { font-size: 14px; font-weight: 500; color: var(--text); margin-bottom: 4px; }
+.upload-sub { font-size: 12px; color: var(--text3); }
+
+/* Modal */
+.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 100; display: flex; align-items: center; justify-content: center; padding: 20px; }
+.modal { background: var(--surface); border-radius: 12px; box-shadow: 0 20px 60px rgba(0,0,0,0.2); width: 100%; max-width: 540px; max-height: 90vh; overflow-y: auto; }
+.modal-header { padding: 18px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+.modal-title { font-size: 15px; font-weight: 600; }
+.modal-body { padding: 20px; }
+.modal-footer { padding: 14px 20px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 8px; }
+
+/* Alerts */
+.alert { padding: 10px 14px; border-radius: var(--radius); font-size: 13px; margin-bottom: 16px; display: flex; align-items: flex-start; gap: 8px; }
+.alert-success { background: var(--green-bg); color: var(--green); border: 1px solid #bbf7d0; }
+.alert-error { background: var(--red-bg); color: var(--red); border: 1px solid #fecaca; }
+.alert-info { background: var(--accent-bg); color: var(--accent); border: 1px solid var(--accent-border); }
+.alert-amber { background: var(--amber-bg); color: var(--amber); border: 1px solid #fde68a; }
+
+/* Tabs */
+.tabs { display: flex; border-bottom: 1px solid var(--border); margin-bottom: 20px; }
+.tab { padding: 8px 16px; font-size: 13px; font-weight: 500; color: var(--text2); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+.tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+.tab-panel { display: none; }
+.tab-panel.active { display: block; }
+
+/* Empty state */
+.empty { text-align: center; padding: 40px 20px; color: var(--text3); }
+.empty svg { width: 40px; height: 40px; margin: 0 auto 12px; display: block; opacity: 0.4; }
+.empty-title { font-size: 14px; font-weight: 500; color: var(--text2); margin-bottom: 6px; }
+.empty-sub { font-size: 13px; }
+
+/* F29 specific */
+.f29-section { margin-bottom: 20px; }
+.f29-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--border); }
+.f29-row:last-child { border-bottom: none; }
+.f29-label { font-size: 13px; color: var(--text2); }
+.f29-value { font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.f29-total { background: var(--bg); border-radius: var(--radius); padding: 14px; margin-top: 12px; display: flex; justify-content: space-between; align-items: center; }
+.f29-total-label { font-size: 14px; font-weight: 600; }
+.f29-total-value { font-size: 24px; font-weight: 700; color: var(--red); font-variant-numeric: tabular-nums; }
+
+/* Diario / Mayor rows */
+.asiento-group { border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 10px; overflow: hidden; }
+.asiento-header { background: var(--bg); padding: 8px 12px; display: flex; gap: 16px; font-size: 12px; color: var(--text2); border-bottom: 1px solid var(--border); }
+.asiento-header strong { color: var(--text); }
+
+/* Util */
+.flex { display: flex; }
+.flex-between { display: flex; justify-content: space-between; align-items: center; }
+.flex-center { display: flex; align-items: center; }
+.gap8 { gap: 8px; }
+.gap12 { gap: 12px; }
+.text-right { text-align: right; }
+.text-muted { color: var(--text3); font-size: 12px; }
+.hidden { display: none !important; }
+.loading { display: flex; align-items: center; justify-content: center; padding: 40px; color: var(--text3); gap: 8px; }
+.spinner { width: 18px; height: 18px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.7s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+
+<div class="shell">
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <span>ContaPyme</span>
+      <small>Sistema contable</small>
+    </div>
+    <div class="company-selector">
+      <select id="company-select" onchange="onCompanyChange()">
+        <option value="">— Selecciona empresa —</option>
+      </select>
+    </div>
+    <nav class="nav">
+      <div class="nav-section">Principal</div>
+      <a class="nav-item active" onclick="navigate('dashboard')" href="#">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+        Resumen
+      </a>
+      <div class="nav-section">Carga</div>
+      <a class="nav-item" onclick="navigate('importar-rcv')" href="#">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+        Importar RCV
+      </a>
+      <a class="nav-item" onclick="navigate('importar-honorarios')" href="#">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        Honorarios
+      </a>
+      <a class="nav-item" onclick="navigate('importar-banco')" href="#">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+        Cartola banco
+      </a>
+      <div class="nav-section">Contabilidad</div>
+      <a class="nav-item" onclick="navigate('asientos')" href="#">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+        Asiento manual
+      </a>
+      <a class="nav-item" onclick="navigate('libro-diario')" href="#">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+        Libro diario
+      </a>
+      <a class="nav-item" onclick="navigate('libro-mayor')" href="#">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/><line x1="9" y1="7" x2="15" y2="7"/><line x1="9" y1="12" x2="15" y2="12"/></svg>
+        Libro mayor
+      </a>
+      <div class="nav-section">Reportes</div>
+      <a class="nav-item" onclick="navigate('f29')" href="#">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="15" y2="17"/></svg>
+        F29
+      </a>
+      <a class="nav-item" onclick="navigate('balance')" href="#">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+        Balance 8 columnas
+      </a>
+      <a class="nav-item" onclick="navigate('eerr')" href="#">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        Est. Resultados
+      </a>
+      <div class="nav-section">Config</div>
+      <a class="nav-item" onclick="navigate('empresas')" href="#">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>
+        Empresas
+      </a>
+      <a class="nav-item" onclick="navigate('plan-cuentas')" href="#">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+        Plan de cuentas
+      </a>
+    </nav>
+  </aside>
+
+  <!-- MAIN -->
+  <div class="main">
+    <div class="topbar">
+      <div class="page-title" id="page-title">Resumen</div>
+      <div class="period-selector">
+        <select id="month-select" onchange="onPeriodChange()">
+          <option value="1">Enero</option><option value="2">Febrero</option>
+          <option value="3">Marzo</option><option value="4">Abril</option>
+          <option value="5">Mayo</option><option value="6">Junio</option>
+          <option value="7">Julio</option><option value="8">Agosto</option>
+          <option value="9">Septiembre</option><option value="10">Octubre</option>
+          <option value="11">Noviembre</option><option value="12">Diciembre</option>
+        </select>
+        <select id="year-select" onchange="onPeriodChange()">
+          <option value="2025">2025</option>
+          <option value="2026">2026</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="page">
+      <!-- PAGES -->
+      <div id="page-dashboard" class="tab-panel active"></div>
+      <div id="page-empresas" class="tab-panel"></div>
+      <div id="page-plan-cuentas" class="tab-panel"></div>
+      <div id="page-importar-rcv" class="tab-panel"></div>
+      <div id="page-importar-honorarios" class="tab-panel"></div>
+      <div id="page-importar-banco" class="tab-panel"></div>
+      <div id="page-asientos" class="tab-panel"></div>
+      <div id="page-libro-diario" class="tab-panel"></div>
+      <div id="page-libro-mayor" class="tab-panel"></div>
+      <div id="page-f29" class="tab-panel"></div>
+      <div id="page-balance" class="tab-panel"></div>
+      <div id="page-eerr" class="tab-panel"></div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL -->
+<div id="modal-overlay" class="modal-overlay hidden" onclick="closeModalOverlay(event)">
+  <div class="modal" id="modal-content"></div>
+</div>
+
+<script>
+// ─── DATE HELPER ──────────────────────────────────────────────────
+function parseFecha(str) {
+  if (!str) return null;
+  // DD/MM/YYYY → YYYY-MM-DD
+  const dmY = str.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (dmY) return `${dmY[3]}-${dmY[2]}-${dmY[1]}`;
+  // Already YYYY-MM-DD
+  const Ymd = str.match(/^\d{4}-\d{2}-\d{2}$/);
+  if (Ymd) return str;
+  return null;
+}
+
+// ─── CONFIG ───────────────────────────────────────────────────────
+const SUPABASE_URL = 'https://essvxzblnwaohbuuquze.supabase.co';
+const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVzc3Z4emJsbndhb2hidXVxdXplIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI2NzU1NjAsImV4cCI6MjA5ODI1MTU2MH0.dPwQZMbx9fYOT0TK6LgBEqWLg2y3J-RpgjV6as3Hqt8';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+
+// ─── STATE ────────────────────────────────────────────────────────
+let state = {
+  page: 'dashboard',
+  empresaId: null,
+  empresaNombre: '',
+  mes: new Date().getMonth() + 1,
+  anio: new Date().getFullYear(),
+  empresas: [],
+  cuentas: []
+};
+
+// ─── INIT ─────────────────────────────────────────────────────────
+document.getElementById('month-select').value = state.mes;
+document.getElementById('year-select').value = state.anio;
+
+async function init() {
+  await loadEmpresas();
+  navigate('dashboard');
+}
+
+async function loadEmpresas() {
+  const { data } = await sb.from('empresas').select('*').order('razon_social');
+  state.empresas = data || [];
+  const sel = document.getElementById('company-select');
+  sel.innerHTML = '<option value="">— Selecciona empresa —</option>';
+  (data || []).forEach(e => {
+    const opt = document.createElement('option');
+    opt.value = e.id;
+    opt.textContent = e.razon_social;
+    sel.appendChild(opt);
+  });
+  if (state.empresaId) sel.value = state.empresaId;
+}
+
+async function loadCuentas() {
+  if (!state.empresaId) return;
+  const { data } = await sb.from('cuentas').select('*').eq('empresa_id', state.empresaId).order('codigo');
+  state.cuentas = data || [];
+}
+
+function onCompanyChange() {
+  const sel = document.getElementById('company-select');
+  state.empresaId = sel.value || null;
+  state.empresaNombre = sel.options[sel.selectedIndex]?.text || '';
+  loadCuentas();
+  navigate(state.page);
+}
+
+function onPeriodChange() {
+  state.mes = parseInt(document.getElementById('month-select').value);
+  state.anio = parseInt(document.getElementById('year-select').value);
+  navigate(state.page);
+}
+
+// ─── NAVIGATION ───────────────────────────────────────────────────
+function navigate(page) {
+  state.page = page;
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('page-' + page).classList.add('active');
+  const nav = document.querySelector(`.nav-item[onclick="navigate('${page}')"]`);
+  if (nav) nav.classList.add('active');
+  const titles = {
+    'dashboard':'Resumen','empresas':'Empresas','plan-cuentas':'Plan de cuentas',
+    'importar-rcv':'Importar RCV','importar-honorarios':'Importar honorarios',
+    'importar-banco':'Importar cartola bancaria','asientos':'Asiento manual',
+    'libro-diario':'Libro diario','libro-mayor':'Libro mayor',
+    'f29':'Formulario 29','balance':'Balance 8 columnas','eerr':'Estado de resultados'
+  };
+  document.getElementById('page-title').textContent = titles[page] || page;
+  const renders = {
+    'dashboard': renderDashboard, 'empresas': renderEmpresas,
+    'plan-cuentas': renderPlanCuentas, 'importar-rcv': renderImportarRCV,
+    'importar-honorarios': renderImportarHonorarios, 'importar-banco': renderImportarBanco,
+    'asientos': renderAsientos, 'libro-diario': renderLibroDiario,
+    'libro-mayor': renderLibroMayor, 'f29': renderF29,
+    'balance': renderBalance, 'eerr': renderEERR
+  };
+  if (renders[page]) renders[page]();
+}
+
+// ─── HELPERS ──────────────────────────────────────────────────────
+function clp(n) {
+  if (!n && n !== 0) return '—';
+  return '$' + Math.round(n).toLocaleString('es-CL');
+}
+function requireEmpresa(el) {
+  if (!state.empresaId) {
+    el.innerHTML = `<div class="alert alert-info">Selecciona una empresa en el menú lateral para continuar.</div>`;
+    return false;
+  }
+  return true;
+}
+function showAlert(msg, type='success') {
+  const a = document.createElement('div');
+  a.className = `alert alert-${type}`;
+  a.textContent = msg;
+  document.querySelector('.page').prepend(a);
+  setTimeout(() => a.remove(), 4000);
+}
+function getPeriodoLabel() {
+  const meses = ['','Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  return `${meses[state.mes]} ${state.anio}`;
+}
+
+// ─── PERIOD HELPERS ───────────────────────────────────────────────
+async function getOrCreatePeriodo() {
+  if (!state.empresaId) return null;
+  const { data: existing } = await sb.from('periodos').select('id').eq('empresa_id', state.empresaId).eq('anio', state.anio).eq('mes', state.mes).single();
+  if (existing) return existing.id;
+  const { data: nuevo } = await sb.from('periodos').insert({ empresa_id: state.empresaId, anio: state.anio, mes: state.mes }).select('id').single();
+  return nuevo?.id;
+}
+
+// ─── DASHBOARD ────────────────────────────────────────────────────
+async function renderDashboard() {
+  const el = document.getElementById('page-dashboard');
+  if (!requireEmpresa(el)) return;
+  el.innerHTML = `<div class="loading"><div class="spinner"></div> Cargando...</div>`;
+
+  const periodoId = await getPeriodoIdSilent();
+
+  let ventas = 0, compras = 0, honorarios = 0, ivaDebito = 0, ivaCredito = 0, ppm = 0;
+
+  if (periodoId) {
+    const { data: ventas_data } = await sb.from('rcv_documentos').select('monto_neto, iva').eq('empresa_id', state.empresaId).eq('periodo_id', periodoId).eq('tipo_mov', 'venta');
+    const { data: compras_data } = await sb.from('rcv_documentos').select('monto_neto, iva').eq('empresa_id', state.empresaId).eq('periodo_id', periodoId).eq('tipo_mov', 'compra');
+    const { data: hon_data } = await sb.from('honorarios').select('monto_bruto, retencion').eq('empresa_id', state.empresaId).eq('periodo_id', periodoId);
+    ventas = (ventas_data || []).reduce((s, r) => s + (r.monto_neto || 0), 0);
+    ivaDebito = (ventas_data || []).reduce((s, r) => s + (r.iva || 0), 0);
+    compras = (compras_data || []).reduce((s, r) => s + (r.monto_neto || 0), 0);
+    ivaCredito = (compras_data || []).reduce((s, r) => s + (r.iva || 0), 0);
+    honorarios = (hon_data || []).reduce((s, r) => s + (r.monto_bruto || 0), 0);
+    const emp = state.empresas.find(e => e.id === state.empresaId);
+    ppm = Math.round(ventas * (emp?.tasa_ppm || 0.25) / 100);
+  }
+
+  const ivaPagar = Math.max(0, ivaDebito - ivaCredito);
+  const resultado = ventas - compras - honorarios;
+
+  el.innerHTML = `
+    <div class="mb24">
+      <div class="flex-between mb16">
+        <div style="font-size:13px;color:var(--text2)">Período: <strong>${getPeriodoLabel()}</strong> — ${state.empresaNombre}</div>
+      </div>
+      <div class="grid4 mb16">
+        <div class="metric"><div class="metric-label">Ventas netas</div><div class="metric-value green">${clp(ventas)}</div></div>
+        <div class="metric"><div class="metric-label">Compras netas</div><div class="metric-value">${clp(compras)}</div></div>
+        <div class="metric"><div class="metric-label">Honorarios</div><div class="metric-value">${clp(honorarios)}</div></div>
+        <div class="metric"><div class="metric-label">Resultado del mes</div><div class="metric-value ${resultado >= 0 ? 'green' : 'red'}">${clp(resultado)}</div></div>
+      </div>
+      <div class="grid3">
+        <div class="metric"><div class="metric-label">IVA débito fiscal</div><div class="metric-value">${clp(ivaDebito)}</div><div class="metric-sub">Sobre ventas</div></div>
+        <div class="metric"><div class="metric-label">IVA crédito fiscal</div><div class="metric-value green">${clp(ivaCredito)}</div><div class="metric-sub">Sobre compras</div></div>
+        <div class="metric"><div class="metric-label">IVA a pagar F29</div><div class="metric-value ${ivaPagar > 0 ? 'red' : 'green'}">${clp(ivaPagar)}</div><div class="metric-sub">PPM: ${clp(ppm)}</div></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header"><span class="card-title">Acciones rápidas</span></div>
+      <div class="card-body">
+        <div class="flex gap8" style="flex-wrap:wrap">
+          <button class="btn" onclick="navigate('importar-rcv')">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            Importar RCV
+          </button>
+          <button class="btn" onclick="navigate('importar-honorarios')">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            Importar honorarios
+          </button>
+          <button class="btn" onclick="navigate('f29')">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            Ver F29
+          </button>
+          <button class="btn" onclick="navigate('asientos')">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Asiento manual
+          </button>
+        </div>
+      </div>
+    </div>`;
+}
+
+async function getPeriodoIdSilent() {
+  if (!state.empresaId) return null;
+  const { data } = await sb.from('periodos').select('id').eq('empresa_id', state.empresaId).eq('anio', state.anio).eq('mes', state.mes).single();
+  return data?.id || null;
+}
+
+// ─── EMPRESAS ─────────────────────────────────────────────────────
+function renderEmpresas() {
+  const el = document.getElementById('page-empresas');
+  const rows = state.empresas.map(e => `
+    <tr>
+      <td>${e.rut}</td>
+      <td><strong>${e.razon_social}</strong></td>
+      <td><span class="badge badge-blue">${e.regimen || '—'}</span></td>
+      <td class="td-num">${e.tasa_ppm || 0}%</td>
+      <td>
+        <button class="btn btn-sm" onclick="editEmpresa('${e.id}')">Editar</button>
+        <button class="btn btn-sm btn-danger" onclick="deleteEmpresa('${e.id}','${e.razon_social}')">Eliminar</button>
+      </td>
+    </tr>`).join('') || `<tr><td colspan="5"><div class="empty"><div class="empty-title">Sin empresas aún</div><div class="empty-sub">Agrega tu primer cliente</div></div></td></tr>`;
+
+  el.innerHTML = `
+    <div class="flex-between mb16">
+      <div></div>
+      <button class="btn btn-primary" onclick="newEmpresa()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        Nueva empresa
+      </button>
+    </div>
+    <div class="card">
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>RUT</th><th>Razón social</th><th>Régimen</th><th>PPM</th><th>Acciones</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+    </div>`;
+}
+
+function newEmpresa() {
+  showModal('Nueva empresa', `
+    <div class="form-group"><label class="form-label">RUT (con dígito verificador)</label><input class="form-input" id="m-rut" placeholder="76.123.456-7"></div>
+    <div class="form-group"><label class="form-label">Razón social</label><input class="form-input" id="m-rs" placeholder="Empresa Ejemplo SpA"></div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">Régimen tributario</label>
+        <select class="form-select" id="m-reg">
+          <option value="14D3">14 D3 — Régimen General</option>
+          <option value="14D8">14 D8 — Propyme Transparente</option>
+        </select>
+      </div>
+      <div class="form-group"><label class="form-label">Tasa PPM (%)</label><input class="form-input" id="m-ppm" type="number" step="0.01" value="0.25" placeholder="0.25"></div>
+    </div>`,
+    async () => {
+      const rut = document.getElementById('m-rut').value.trim();
+      const rs = document.getElementById('m-rs').value.trim();
+      const reg = document.getElementById('m-reg').value;
+      const ppm = parseFloat(document.getElementById('m-ppm').value) || 0;
+      if (!rut || !rs) return showAlert('Completa RUT y razón social', 'error');
+      const { error } = await sb.from('empresas').insert({ rut, razon_social: rs, regimen: reg, tasa_ppm: ppm });
+      if (error) return showAlert('Error: ' + error.message, 'error');
+      await loadEmpresas();
+      closeModal();
+      renderEmpresas();
+      showAlert('Empresa creada correctamente');
+    });
+}
+
+async function editEmpresa(id) {
+  const e = state.empresas.find(x => x.id === id);
+  if (!e) return;
+  showModal('Editar empresa', `
+    <div class="form-group"><label class="form-label">RUT</label><input class="form-input" id="m-rut" value="${e.rut}"></div>
+    <div class="form-group"><label class="form-label">Razón social</label><input class="form-input" id="m-rs" value="${e.razon_social}"></div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">Régimen tributario</label>
+        <select class="form-select" id="m-reg">
+          <option value="14D3" ${e.regimen==='14D3'?'selected':''}>14 D3 — Régimen General</option>
+          <option value="14D8" ${e.regimen==='14D8'?'selected':''}>14 D8 — Propyme Transparente</option>
+        </select>
+      </div>
+      <div class="form-group"><label class="form-label">Tasa PPM (%)</label><input class="form-input" id="m-ppm" type="number" step="0.01" value="${e.tasa_ppm || 0}"></div>
+    </div>`,
+    async () => {
+      const rut = document.getElementById('m-rut').value.trim();
+      const rs = document.getElementById('m-rs').value.trim();
+      const reg = document.getElementById('m-reg').value;
+      const ppm = parseFloat(document.getElementById('m-ppm').value) || 0;
+      const { error } = await sb.from('empresas').update({ rut, razon_social: rs, regimen: reg, tasa_ppm: ppm }).eq('id', id);
+      if (error) return showAlert('Error: ' + error.message, 'error');
+      await loadEmpresas();
+      closeModal();
+      renderEmpresas();
+      showAlert('Empresa actualizada');
+    });
+}
+
+async function deleteEmpresa(id, nombre) {
+  if (!confirm(`¿Eliminar "${nombre}"? Se eliminarán todos sus datos.`)) return;
+  await sb.from('empresas').delete().eq('id', id);
+  if (state.empresaId === id) { state.empresaId = null; state.empresaNombre = ''; }
+  await loadEmpresas();
+  renderEmpresas();
+  showAlert('Empresa eliminada');
+}
+
+// ─── PLAN DE CUENTAS ──────────────────────────────────────────────
+async function renderPlanCuentas() {
+  const el = document.getElementById('page-plan-cuentas');
+  if (!requireEmpresa(el)) return;
+  el.innerHTML = `<div class="loading"><div class="spinner"></div> Cargando...</div>`;
+  await loadCuentas();
+
+  const tipos = ['activo','pasivo','patrimonio','ingreso','egreso'];
+  const tipoBadge = { activo:'badge-blue', pasivo:'badge-red', patrimonio:'badge-amber', ingreso:'badge-green', egreso:'badge-gray' };
+
+  const rows = state.cuentas.map(c => `
+    <tr>
+      <td class="td-num" style="font-family:monospace;width:90px">${c.codigo}</td>
+      <td>${c.nombre}</td>
+      <td><span class="badge ${tipoBadge[c.tipo] || 'badge-gray'}">${c.tipo}</span></td>
+      <td>${c.subtipo || '—'}</td>
+      <td>
+        <button class="btn btn-sm btn-danger" onclick="deleteCuenta('${c.id}')">Eliminar</button>
+      </td>
+    </tr>`).join('') || `<tr><td colspan="5"><div class="empty"><div class="empty-title">Sin cuentas</div><div class="empty-sub">Importa el plan de cuentas estándar o agrega cuentas manualmente</div></div></td></tr>`;
+
+  el.innerHTML = `
+    <div class="flex-between mb16">
+      <div class="text-muted">${state.cuentas.length} cuentas</div>
+      <div class="flex gap8">
+        <button class="btn" onclick="importarPlanEstandar()">Importar plan estándar</button>
+        <button class="btn btn-primary" onclick="newCuenta()">+ Nueva cuenta</button>
+      </div>
+    </div>
+    <div class="card">
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Código</th><th>Nombre</th><th>Tipo</th><th>Subtipo</th><th></th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+    </div>`;
+}
+
+async function importarPlanEstandar() {
+  if (!state.empresaId) return;
+  if (!confirm('¿Importar el plan de cuentas estándar chileno? Se agregarán las cuentas que no existan.')) return;
+
+  const plan = [
+    ['110101','Caja','activo','Disponible'],['110102','Fondo Fijo','activo','Disponible'],
+    ['110103','Bancos','activo','Disponible'],['110105','Clientes','activo','Exigible'],
+    ['110108','Impuestos Por Recuperar','activo','Exigible'],
+    ['110204','P.P.M.','activo','Exigible'],['110205','IVA Crédito Fiscal','activo','Exigible'],
+    ['110206','Remanente IVA Crédito Fiscal','activo','Exigible'],
+    ['120101','Inventarios','activo','Realizable'],['120104','Muebles y Útiles','activo','Fijo'],
+    ['120105','Equipos Computacionales','activo','Fijo'],['120106','Vehículos','activo','Fijo'],
+    ['140101','Pérdidas del ejercicio','activo','Otros'],
+    ['210097','Dep. Acum. Muebles y Útiles','pasivo','Depreciación'],
+    ['210098','Dep. Acum. Equipos Computacionales','pasivo','Depreciación'],
+    ['210099','Dep. Acum. Vehículos','pasivo','Depreciación'],
+    ['210101','Proveedores','pasivo','Corto plazo'],['210102','Préstamos Bancarios','pasivo','Largo plazo'],
+    ['210103','Impuesto Retenido 2da Categ.','pasivo','Corto plazo'],
+    ['210104','IVA Débito Fiscal','pasivo','Corto plazo'],
+    ['210106','Impuesto Único Trabajadores','pasivo','Corto plazo'],
+    ['210107','Leyes Sociales por Pagar','pasivo','Corto plazo'],
+    ['210108','Impuestos por Pagar','pasivo','Corto plazo'],
+    ['210113','P.P.M. Por Pagar','pasivo','Corto plazo'],
+    ['310101','Capital','patrimonio','Capital'],['310102','Utilidades Retenidas','patrimonio','Resultados'],
+    ['410101','Ventas','ingreso','Del giro'],['410102','Ventas Exentas','ingreso','Del giro'],
+    ['410103','Otros Ingresos','ingreso','Fuera del giro'],
+    ['510101','Costo de Ventas','egreso','Costo directo'],
+    ['510102','Remuneraciones','egreso','Gastos administración'],
+    ['510103','Honorarios','egreso','Gastos administración'],
+    ['510104','Arriendos','egreso','Gastos administración'],
+    ['510105','Servicios Básicos','egreso','Gastos administración'],
+    ['510106','Depreciación del ejercicio','egreso','Gastos administración'],
+    ['510107','Gastos Financieros','egreso','Gastos financieros'],
+    ['510108','Otros Gastos','egreso','Gastos administración'],
+  ];
+
+  const existCodigos = new Set(state.cuentas.map(c => c.codigo));
+  const nuevas = plan.filter(([cod]) => !existCodigos.has(cod)).map(([codigo, nombre, tipo, subtipo]) => ({
+    empresa_id: state.empresaId, codigo, nombre, tipo, subtipo
+  }));
+
+  if (nuevas.length === 0) { showAlert('El plan de cuentas ya está completo'); return; }
+  const { error } = await sb.from('cuentas').insert(nuevas);
+  if (error) return showAlert('Error: ' + error.message, 'error');
+  await loadCuentas();
+  renderPlanCuentas();
+  showAlert(`${nuevas.length} cuentas importadas correctamente`);
+}
+
+function newCuenta() {
+  const tipos = ['activo','pasivo','patrimonio','ingreso','egreso'];
+  showModal('Nueva cuenta', `
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">Código</label><input class="form-input" id="m-cod" placeholder="110101"></div>
+      <div class="form-group"><label class="form-label">Tipo</label>
+        <select class="form-select" id="m-tipo">${tipos.map(t=>`<option value="${t}">${t}</option>`).join('')}</select>
+      </div>
+    </div>
+    <div class="form-group"><label class="form-label">Nombre</label><input class="form-input" id="m-nom" placeholder="Nombre de la cuenta"></div>
+    <div class="form-group"><label class="form-label">Subtipo (opcional)</label><input class="form-input" id="m-sub" placeholder="Ej: Disponible, Exigible..."></div>`,
+    async () => {
+      const cod = document.getElementById('m-cod').value.trim();
+      const nom = document.getElementById('m-nom').value.trim();
+      const tipo = document.getElementById('m-tipo').value;
+      const sub = document.getElementById('m-sub').value.trim();
+      if (!cod || !nom) return showAlert('Código y nombre son requeridos', 'error');
+      const { error } = await sb.from('cuentas').insert({ empresa_id: state.empresaId, codigo: cod, nombre: nom, tipo, subtipo: sub || null });
+      if (error) return showAlert('Error: ' + error.message, 'error');
+      await loadCuentas();
+      closeModal();
+      renderPlanCuentas();
+    });
+}
+
+async function deleteCuenta(id) {
+  if (!confirm('¿Eliminar esta cuenta?')) return;
+  await sb.from('cuentas').delete().eq('id', id);
+  await loadCuentas();
+  renderPlanCuentas();
+}
+
+// ─── IMPORTAR RCV ─────────────────────────────────────────────────
+function renderImportarRCV() {
+  const el = document.getElementById('page-importar-rcv');
+  if (!requireEmpresa(el)) return;
+  el.innerHTML = `
+    <div class="grid2 mb16" style="gap:20px">
+      <div>
+        <h3 style="font-size:14px;font-weight:600;margin-bottom:8px">Compras (RCV)</h3>
+        <div class="upload-zone" id="drop-compras" onclick="document.getElementById('file-compras').click()" 
+          ondragover="this.classList.add('drag');event.preventDefault()"
+          ondragleave="this.classList.remove('drag')"
+          ondrop="handleDrop(event,'compras')">
+          <svg class="upload-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          <div class="upload-text">Arrastrar RCV_COMPRA_*.csv</div>
+          <div class="upload-sub">o hacer clic para seleccionar</div>
+        </div>
+        <input type="file" id="file-compras" accept=".csv" class="hidden" onchange="processRCV(this.files[0],'compra')">
+      </div>
+      <div>
+        <h3 style="font-size:14px;font-weight:600;margin-bottom:8px">Ventas (RCV)</h3>
+        <div class="upload-zone" id="drop-ventas" onclick="document.getElementById('file-ventas').click()"
+          ondragover="this.classList.add('drag');event.preventDefault()"
+          ondragleave="this.classList.remove('drag')"
+          ondrop="handleDrop(event,'ventas')">
+          <svg class="upload-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          <div class="upload-text">Arrastrar RCV_VENTA_*.csv</div>
+          <div class="upload-sub">o hacer clic para seleccionar</div>
+        </div>
+        <input type="file" id="file-ventas" accept=".csv" class="hidden" onchange="processRCV(this.files[0],'venta')">
+      </div>
+    </div>
+    <div id="rcv-status"></div>
+    <div id="rcv-preview"></div>`;
+}
+
+function handleDrop(e, tipo) {
+  e.preventDefault();
+  document.getElementById('drop-' + tipo).classList.remove('drag');
+  const file = e.dataTransfer.files[0];
+  if (file) processRCV(file, tipo === 'compras' ? 'compra' : 'venta');
+}
+
+async function processRCV(file, tipoMov) {
+  if (!file) return;
+  const statusEl = document.getElementById('rcv-status');
+  const previewEl = document.getElementById('rcv-preview');
+  statusEl.innerHTML = `<div class="loading"><div class="spinner"></div> Procesando ${file.name}...</div>`;
+
+  const text = await file.text();
+  const lines = text.split('\n').filter(l => l.trim());
+  const sep = lines[0].includes(';') ? ';' : ',';
+  const headers = lines[0].split(sep).map(h => h.replace(/"/g,'').trim());
+
+  const get = (row, name) => {
+    const idx = headers.findIndex(h => h.toLowerCase().includes(name.toLowerCase()));
+    return idx >= 0 ? (row[idx] || '').replace(/"/g,'').trim() : '';
+  };
+
+  const docs = [];
+  for (let i = 1; i < lines.length; i++) {
+    const row = lines[i].split(sep);
+    if (row.length < 5) continue;
+    const razon = get(row, 'Razon') || get(row, 'Razón');
+    const rut = get(row, 'RUT');
+    const folio = get(row, 'Folio');
+    const fecha = parseFecha(get(row, 'Fecha Docto').substring(0, 10));
+    const neto = parseFloat(get(row, 'Monto Neto')) || 0;
+    const iva = parseFloat(get(row, 'Monto IVA Recuperable')) || parseFloat(get(row, 'Monto IVA')) || Math.round(neto * 0.19);
+    const total = parseFloat(get(row, 'Monto Total')) || (neto + iva);
+    const exento = parseFloat(get(row, 'Monto Exento')) || 0;
+    const tipoDoc = parseInt(get(row, 'Tipo Doc') || get(row, 'Nro')) || 33;
+    if (!razon && !rut) continue;
+    docs.push({ rut_contraparte: rut, razon_contraparte: razon, folio, fecha_docto: fecha || null, monto_neto: neto, iva, monto_total: total, monto_exento: exento, tipo_doc: tipoDoc, tipo_mov: tipoMov });
+  }
+
+  if (docs.length === 0) {
+    statusEl.innerHTML = `<div class="alert alert-error">No se encontraron documentos en el archivo. Verifica el formato.</div>`;
+    return;
+  }
+
+  const periodoId = await getOrCreatePeriodo();
+  // Eliminar los del mismo periodo y tipo antes de insertar
+  await sb.from('rcv_documentos').delete().eq('empresa_id', state.empresaId).eq('periodo_id', periodoId).eq('tipo_mov', tipoMov);
+
+  const insertData = docs.map(d => ({ ...d, empresa_id: state.empresaId, periodo_id: periodoId }));
+  const { error } = await sb.from('rcv_documentos').insert(insertData);
+
+  if (error) {
+    statusEl.innerHTML = `<div class="alert alert-error">Error al guardar: ${error.message}</div>`;
+    return;
+  }
+
+  // Generar asientos automáticos
+  await generarAsientosRCV(docs, periodoId, tipoMov);
+
+  const totalNeto = docs.reduce((s, d) => s + d.monto_neto, 0);
+  const totalIVA = docs.reduce((s, d) => s + d.iva, 0);
+  const totalGeneral = docs.reduce((s, d) => s + d.monto_total, 0);
+
+  statusEl.innerHTML = `<div class="alert alert-success">✓ ${docs.length} documentos de ${tipoMov === 'compra' ? 'compras' : 'ventas'} importados — ${getPeriodoLabel()}</div>`;
+  previewEl.innerHTML = `
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">Resumen importación — ${tipoMov === 'compra' ? 'Compras' : 'Ventas'}</span>
+        <span class="badge ${tipoMov==='compra'?'badge-blue':'badge-green'}">${docs.length} docs</span>
+      </div>
+      <div class="card-body">
+        <div class="grid3 mb16">
+          <div class="metric"><div class="metric-label">Neto total</div><div class="metric-value">${clp(totalNeto)}</div></div>
+          <div class="metric"><div class="metric-label">IVA total</div><div class="metric-value">${clp(totalIVA)}</div></div>
+          <div class="metric"><div class="metric-label">Total con IVA</div><div class="metric-value">${clp(totalGeneral)}</div></div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Fecha</th><th>RUT</th><th>Proveedor/Cliente</th><th>Doc</th><th class="td-num">Neto</th><th class="td-num">IVA</th><th class="td-num">Total</th></tr></thead>
+            <tbody>
+              ${docs.slice(0,20).map(d=>`<tr>
+                <td class="td-muted">${d.fecha_docto||'—'}</td>
+                <td class="td-muted">${d.rut_contraparte}</td>
+                <td>${d.razon_contraparte}</td>
+                <td><span class="badge badge-gray">${d.tipo_doc}</span></td>
+                <td class="td-num">${clp(d.monto_neto)}</td>
+                <td class="td-num td-muted">${clp(d.iva)}</td>
+                <td class="td-num">${clp(d.monto_total)}</td>
+              </tr>`).join('')}
+              ${docs.length > 20 ? `<tr><td colspan="7" class="td-muted" style="text-align:center">... y ${docs.length - 20} documentos más</td></tr>` : ''}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>`;
+}
+
+async function generarAsientosRCV(docs, periodoId, tipoMov) {
+  // Obtener cuentas necesarias
+  const getCuenta = (codigo) => state.cuentas.find(c => c.codigo === codigo)?.id;
+  const fecha = `${state.anio}-${String(state.mes).padStart(2,'0')}-28`;
+
+  // Borrar asientos anteriores de RCV del mismo periodo y tipo
+  const { data: viejos } = await sb.from('asientos').select('id').eq('empresa_id', state.empresaId).eq('periodo_id', periodoId).eq('origen', 'rcv');
+  if (viejos?.length) {
+    const ids = viejos.map(a => a.id);
+    await sb.from('asiento_lineas').delete().in('asiento_id', ids);
+    await sb.from('asientos').delete().in('id', ids);
+  }
+
+  const totalNeto = docs.reduce((s, d) => s + d.monto_neto, 0);
+  const totalIVA = docs.reduce((s, d) => s + d.iva, 0);
+  const totalTotal = docs.reduce((s, d) => s + d.monto_total, 0);
+
+  const { data: asiento } = await sb.from('asientos').insert({
+    empresa_id: state.empresaId, periodo_id: periodoId, fecha,
+    glosa: `Centralización RCV ${tipoMov === 'compra' ? 'Compras' : 'Ventas'} — ${getPeriodoLabel()}`,
+    origen: 'rcv'
+  }).select('id').single();
+
+  if (!asiento?.id) return;
+
+  const lineas = [];
+  if (tipoMov === 'compra') {
+    const cCosto = getCuenta('510101') || getCuenta('510108');
+    const cIVACred = getCuenta('110205');
+    const cProv = getCuenta('210101');
+    if (cCosto) lineas.push({ asiento_id: asiento.id, cuenta_id: cCosto, debe: totalNeto, haber: 0, glosa: 'Gasto neto compras' });
+    if (cIVACred) lineas.push({ asiento_id: asiento.id, cuenta_id: cIVACred, debe: totalIVA, haber: 0, glosa: 'IVA Crédito Fiscal' });
+    if (cProv) lineas.push({ asiento_id: asiento.id, cuenta_id: cProv, debe: 0, haber: totalTotal, glosa: 'Proveedores' });
+  } else {
+    const cClientes = getCuenta('110105');
+    const cVentas = getCuenta('410101');
+    const cIVADeb = getCuenta('210104');
+    if (cClientes) lineas.push({ asiento_id: asiento.id, cuenta_id: cClientes, debe: totalTotal, haber: 0, glosa: 'Clientes' });
+    if (cVentas) lineas.push({ asiento_id: asiento.id, cuenta_id: cVentas, debe: 0, haber: totalNeto, glosa: 'Ventas netas' });
+    if (cIVADeb) lineas.push({ asiento_id: asiento.id, cuenta_id: cIVADeb, debe: 0, haber: totalIVA, glosa: 'IVA Débito Fiscal' });
+  }
+  if (lineas.length) await sb.from('asiento_lineas').insert(lineas);
+}
+
+// ─── IMPORTAR HONORARIOS ──────────────────────────────────────────
+function renderImportarHonorarios() {
+  const el = document.getElementById('page-importar-honorarios');
+  if (!requireEmpresa(el)) return;
+  el.innerHTML = `
+    <div class="grid2" style="gap:20px;margin-bottom:20px">
+      <div>
+        <h3 style="font-size:14px;font-weight:600;margin-bottom:8px">Subir boleta PDF <span class="badge badge-blue" style="font-size:10px;vertical-align:middle">IA</span></h3>
+        <div class="upload-zone" id="drop-hon-pdf" onclick="document.getElementById('file-hon-pdf').click()"
+          ondragover="this.classList.add('drag');event.preventDefault()"
+          ondragleave="this.classList.remove('drag')"
+          ondrop="this.classList.remove('drag');processPDFHonorario(event.dataTransfer.files[0]);event.preventDefault()">
+          <svg class="upload-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="15" y2="17"/></svg>
+          <div class="upload-text">Arrastrar boleta de honorarios PDF</div>
+          <div class="upload-sub">La IA extrae los datos automáticamente</div>
+        </div>
+        <input type="file" id="file-hon-pdf" accept=".pdf,.cgi" class="hidden" onchange="processPDFHonorario(this.files[0])">
+        <div id="hon-pdf-status" style="margin-top:12px"></div>
+      </div>
+      <div>
+        <h3 style="font-size:14px;font-weight:600;margin-bottom:8px">Ingreso manual</h3>
+        <div class="card">
+          <div class="card-body">
+            <div class="form-group"><label class="form-label">RUT trabajador</label><input class="form-input" id="hon-rut" placeholder="8.181.620-4"></div>
+            <div class="form-group"><label class="form-label">Nombre</label><input class="form-input" id="hon-nombre" placeholder="María Pérez"></div>
+            <div class="form-group"><label class="form-label">Monto bruto ($)</label><input class="form-input" id="hon-bruto" type="number" placeholder="200590" oninput="autoRetHon()"></div>
+            <div class="form-row">
+              <div class="form-group"><label class="form-label">Retención</label><input class="form-input" id="hon-ret" type="number" placeholder="30590"></div>
+              <div class="form-group"><label class="form-label">Monto líquido</label><input class="form-input" id="hon-liq" type="number" placeholder="170000"></div>
+            </div>
+            <button class="btn btn-primary" onclick="saveHonorarioManual()">Guardar</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div id="hon-tabla-wrap"></div>`;
+
+  loadTablaHonorarios();
+}
+
+function autoRetHon() {
+  const bruto = parseFloat(document.getElementById('hon-bruto').value) || 0;
+  const ret = Math.round(bruto * 0.1525);
+  document.getElementById('hon-ret').value = ret;
+  document.getElementById('hon-liq').value = bruto - ret;
+}
+
+async function extractPDFText(file) {
+  const arrayBuffer = await file.arrayBuffer();
+  const pdfjsLib = window['pdfjs-dist/build/pdf'];
+  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+  let text = '';
+  for (let i = 1; i <= pdf.numPages; i++) {
+    const page = await pdf.getPage(i);
+    const content = await page.getTextContent();
+    text += content.items.map(item => item.str).join(' ') + '\n';
+  }
+  return text;
+}
+
+async function processPDFHonorario(file) {
+  if (!file) return;
+  const statusEl = document.getElementById('hon-pdf-status');
+  statusEl.innerHTML = `<div class="loading"><div class="spinner"></div> Extrayendo texto del PDF...</div>`;
+
+  let pdfText = '';
+  try {
+    pdfText = await extractPDFText(file);
+  } catch(e) {
+    statusEl.innerHTML = `<div class="alert alert-error">No se pudo leer el PDF. Usa el ingreso manual.</div>`;
+    return;
+  }
+
+  statusEl.innerHTML = `<div class="loading"><div class="spinner"></div> Analizando con IA...</div>`;
+
+  try {
+    const prompt = `Extrae los datos de esta boleta de honorarios chilena y responde SOLO con JSON sin texto ni backticks:
+{"rut":"8.181.620-4","nombre":"NOMBRE COMPLETO","bruto":200590,"retencion":30590,"liquido":170000,"fecha":"2026-05-01","numero_boleta":"68","descripcion":"descripcion del servicio"}
+
+Texto de la boleta:
+` + pdfText;
+
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 500,
+        messages: [{ role: 'user', content: prompt }]
+      })
+    });
+
+    const data = await response.json();
+    const text = data.content?.[0]?.text || '';
+    const clean = text.replace(/```json|```/g, '').trim();
+    const hon = JSON.parse(clean);
+
+    statusEl.innerHTML = `
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Boleta N° ${hon.numero_boleta || '—'} — ${hon.nombre}</span>
+          <span class="badge badge-green">IA</span>
+        </div>
+        <div class="card-body">
+          <div class="form-row3" style="margin-bottom:10px">
+            <div><div class="text-muted">RUT</div><strong>${hon.rut}</strong></div>
+            <div><div class="text-muted">Nombre</div><strong>${hon.nombre}</strong></div>
+            <div><div class="text-muted">Fecha</div><strong>${hon.fecha || '—'}</strong></div>
+          </div>
+          <div class="form-row3" style="margin-bottom:14px">
+            <div><div class="text-muted">Monto bruto</div><strong>${clp(hon.bruto)}</strong></div>
+            <div><div class="text-muted">Retención</div><strong style="color:var(--red)">${clp(hon.retencion)}</strong></div>
+            <div><div class="text-muted">Líquido</div><strong style="color:var(--green)">${clp(hon.liquido)}</strong></div>
+          </div>
+          <div style="font-size:12px;color:var(--text2);margin-bottom:12px">${hon.descripcion || ''}</div>
+          <div class="flex gap8">
+            <button class="btn btn-primary" onclick='confirmarHonorarioPDF(${JSON.stringify(hon)})'>Guardar boleta</button>
+            <button class="btn" onclick="document.getElementById('hon-pdf-status').innerHTML=''">Cancelar</button>
+          </div>
+        </div>
+      </div>`;
+  } catch(e) {
+    statusEl.innerHTML = `<div class="alert alert-error">Error al analizar: ${e.message}. Usa el ingreso manual.</div>`;
+  }
+}
+async function confirmarHonorarioPDF(hon) {
+  const periodoId = await getOrCreatePeriodo();
+  const { error } = await sb.from('honorarios').insert({
+    empresa_id: state.empresaId, periodo_id: periodoId,
+    rut_trabajador: hon.rut, nombre_trabajador: hon.nombre,
+    monto_bruto: hon.bruto, retencion: hon.retencion, monto_liquido: hon.liquido
+  });
+  if (error) return showAlert('Error: ' + error.message, 'error');
+  document.getElementById('hon-pdf-status').innerHTML = '';
+  document.getElementById('file-hon-pdf').value = '';
+  showAlert(`Boleta de ${hon.nombre} guardada correctamente`);
+  await generarAsientoHonorario(periodoId);
+  loadTablaHonorarios();
+}
+
+async function loadTablaHonorarios() {
+  const wrap = document.getElementById('hon-tabla-wrap');
+  if (!wrap) return;
+  const periodoId = await getPeriodoIdSilent();
+  if (!periodoId) { wrap.innerHTML = ''; return; }
+  const { data } = await sb.from('honorarios').select('*').eq('empresa_id', state.empresaId).eq('periodo_id', periodoId).order('created_at');
+  if (!data?.length) { wrap.innerHTML = `<div class="empty" style="padding:20px"><div class="empty-title">Sin boletas en ${getPeriodoLabel()}</div></div>`; return; }
+  const totalBruto = data.reduce((s,h) => s+h.monto_bruto, 0);
+  const totalRet = data.reduce((s,h) => s+h.retencion, 0);
+  const totalLiq = data.reduce((s,h) => s+h.monto_liquido, 0);
+  wrap.innerHTML = `
+    <div class="card">
+      <div class="card-header"><span class="card-title">Boletas del período — ${getPeriodoLabel()}</span><span class="badge badge-blue">${data.length} boletas</span></div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>RUT</th><th>Nombre</th><th class="td-num">Bruto</th><th class="td-num">Retención</th><th class="td-num">Líquido</th><th></th></tr></thead>
+          <tbody>
+            ${data.map(h=>`<tr>
+              <td class="td-muted">${h.rut_trabajador||'—'}</td>
+              <td>${h.nombre_trabajador}</td>
+              <td class="td-num">${clp(h.monto_bruto)}</td>
+              <td class="td-num" style="color:var(--red)">${clp(h.retencion)}</td>
+              <td class="td-num" style="color:var(--green)">${clp(h.monto_liquido)}</td>
+              <td><button class="btn btn-sm btn-danger" onclick="deleteHonorario('${h.id}')">Eliminar</button></td>
+            </tr>`).join('')}
+            <tr style="background:var(--bg);font-weight:600">
+              <td colspan="2">Total</td>
+              <td class="td-num">${clp(totalBruto)}</td>
+              <td class="td-num" style="color:var(--red)">${clp(totalRet)}</td>
+              <td class="td-num" style="color:var(--green)">${clp(totalLiq)}</td>
+              <td></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>`;
+}
+
+async function deleteHonorario(id) {
+  if (!confirm('¿Eliminar esta boleta?')) return;
+  await sb.from('honorarios').delete().eq('id', id);
+  const periodoId = await getPeriodoIdSilent();
+  if (periodoId) await generarAsientoHonorario(periodoId);
+  loadTablaHonorarios();
+}
+
+async function saveHonorarioManual() {
+  const rut = document.getElementById('hon-rut').value.trim();
+  const nombre = document.getElementById('hon-nombre').value.trim();
+  const bruto = parseFloat(document.getElementById('hon-bruto').value) || 0;
+  const ret = parseFloat(document.getElementById('hon-ret').value) || 0;
+  const liq = parseFloat(document.getElementById('hon-liq').value) || 0;
+  if (!nombre || bruto === 0) return showAlert('Ingresa nombre y monto', 'error');
+  const periodoId = await getOrCreatePeriodo();
+  const { error } = await sb.from('honorarios').insert({ empresa_id: state.empresaId, periodo_id: periodoId, rut_trabajador: rut, nombre_trabajador: nombre, monto_bruto: bruto, retencion: ret, monto_liquido: liq });
+  if (error) return showAlert('Error: ' + error.message, 'error');
+  showAlert('Honorario guardado correctamente');
+  await generarAsientoHonorario(periodoId);
+}
+
+async function generarAsientoHonorario(periodoId) {
+  const { data: hons } = await sb.from('honorarios').select('*').eq('empresa_id', state.empresaId).eq('periodo_id', periodoId);
+  if (!hons?.length) return;
+  const totalBruto = hons.reduce((s, h) => s + h.monto_bruto, 0);
+  const totalRet = hons.reduce((s, h) => s + h.retencion, 0);
+  const totalLiq = hons.reduce((s, h) => s + h.monto_liquido, 0);
+  const fecha = `${state.anio}-${String(state.mes).padStart(2,'0')}-28`;
+  const getCuenta = (cod) => state.cuentas.find(c => c.codigo === cod)?.id;
+  // Borrar asiento honorarios anterior
+  const { data: viejos } = await sb.from('asientos').select('id').eq('empresa_id', state.empresaId).eq('periodo_id', periodoId).eq('origen', 'honorarios');
+  if (viejos?.length) {
+    await sb.from('asiento_lineas').delete().in('asiento_id', viejos.map(a => a.id));
+    await sb.from('asientos').delete().in('id', viejos.map(a => a.id));
+  }
+  const { data: asiento } = await sb.from('asientos').insert({ empresa_id: state.empresaId, periodo_id: periodoId, fecha, glosa: `Honorarios ${getPeriodoLabel()}`, origen: 'honorarios' }).select('id').single();
+  if (!asiento?.id) return;
+  const cHon = getCuenta('510103');
+  const cRet = getCuenta('210103');
+  const cCaja = getCuenta('110101') || getCuenta('110103');
+  const lineas = [];
+  if (cHon) lineas.push({ asiento_id: asiento.id, cuenta_id: cHon, debe: totalBruto, haber: 0, glosa: 'Honorarios brutos' });
+  if (cRet) lineas.push({ asiento_id: asiento.id, cuenta_id: cRet, debe: 0, haber: totalRet, glosa: 'Retención 2da categoría' });
+  if (cCaja) lineas.push({ asiento_id: asiento.id, cuenta_id: cCaja, debe: 0, haber: totalLiq, glosa: 'Pago líquido honorarios' });
+  if (lineas.length) await sb.from('asiento_lineas').insert(lineas);
+}
+
+// ─── IMPORTAR BANCO ───────────────────────────────────────────────
+function renderImportarBanco() {
+  const el = document.getElementById('page-importar-banco');
+  if (!requireEmpresa(el)) return;
+  el.innerHTML = `
+    <div class="alert alert-info mb16">Sube la cartola bancaria en CSV. Columnas esperadas: Fecha, Descripción, Cargo, Abono, Saldo.</div>
+    <div class="upload-zone" onclick="document.getElementById('file-banco').click()"
+      ondragover="this.classList.add('drag');event.preventDefault()"
+      ondragleave="this.classList.remove('drag')"
+      ondrop="this.classList.remove('drag');processBanco(event.dataTransfer.files[0]);event.preventDefault()">
+      <svg class="upload-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+      <div class="upload-text">Arrastrar cartola bancaria CSV</div>
+      <div class="upload-sub">Formato: Fecha, Descripción, Cargo, Abono, Saldo</div>
+    </div>
+    <input type="file" id="file-banco" accept=".csv" class="hidden" onchange="processBanco(this.files[0])">
+    <div id="banco-status" style="margin-top:16px"></div>`;
+}
+
+async function processBanco(file) {
+  if (!file) return;
+  document.getElementById('banco-status').innerHTML = `<div class="loading"><div class="spinner"></div> Procesando...</div>`;
+  const text = await file.text();
+  const lines = text.split('\n').filter(l => l.trim());
+  const sep = lines[0].includes(';') ? ';' : ',';
+  const headers = lines[0].split(sep).map(h => h.replace(/"/g,'').trim().toLowerCase());
+  const get = (row, name) => { const i = headers.findIndex(h => h.includes(name)); return i >= 0 ? (row[i]||'').replace(/"/g,'').trim() : ''; };
+  const movs = [];
+  for (let i = 1; i < lines.length; i++) {
+    const row = lines[i].split(sep);
+    if (row.length < 3) continue;
+    const fecha = parseFecha(get(row, 'fecha').substring(0, 10));
+    const desc = get(row, 'desc') || get(row, 'detalle') || get(row, 'glosa');
+    const cargo = parseFloat(get(row, 'cargo').replace(/\./g,'').replace(',','.')) || 0;
+    const abono = parseFloat(get(row, 'abono').replace(/\./g,'').replace(',','.')) || 0;
+    const saldo = parseFloat(get(row, 'saldo').replace(/\./g,'').replace(',','.')) || 0;
+    if (!desc) continue;
+    movs.push({ fecha_docto: fecha || null, descripcion: desc, cargo, abono, saldo });
+  }
+  const periodoId = await getOrCreatePeriodo();
+  await sb.from('movimientos_banco').delete().eq('empresa_id', state.empresaId).eq('periodo_id', periodoId);
+  if (movs.length) {
+    const { error } = await sb.from('movimientos_banco').insert(movs.map(m => ({ ...m, empresa_id: state.empresaId, periodo_id: periodoId })));
+    if (error) { document.getElementById('banco-status').innerHTML = `<div class="alert alert-error">${error.message}</div>`; return; }
+  }
+  document.getElementById('banco-status').innerHTML = `
+    <div class="alert alert-success">✓ ${movs.length} movimientos bancarios importados</div>
+    <div class="card"><div class="table-wrap"><table>
+      <thead><tr><th>Fecha</th><th>Descripción</th><th class="td-num">Cargo</th><th class="td-num">Abono</th><th class="td-num">Saldo</th></tr></thead>
+      <tbody>${movs.slice(0,15).map(m=>`<tr><td class="td-muted">${m.fecha_docto||'—'}</td><td>${m.descripcion}</td><td class="td-num ${m.cargo>0?'':'td-muted'}">${m.cargo>0?clp(m.cargo):'—'}</td><td class="td-num ${m.abono>0?'':'td-muted'}">${m.abono>0?clp(m.abono):'—'}</td><td class="td-num">${clp(m.saldo)}</td></tr>`).join('')}</tbody>
+    </table></div></div>`;
+}
+
+// ─── ASIENTO MANUAL ───────────────────────────────────────────────
+function renderAsientos() {
+  const el = document.getElementById('page-asientos');
+  if (!requireEmpresa(el)) return;
+  if (!state.cuentas.length) {
+    el.innerHTML = `<div class="alert alert-amber">Primero configura el plan de cuentas en <a href="#" onclick="navigate('plan-cuentas')">Plan de cuentas</a>.</div>`;
+    return;
+  }
+  const optsCuentas = state.cuentas.map(c => `<option value="${c.id}">${c.codigo} — ${c.nombre}</option>`).join('');
+  el.innerHTML = `
+    <div class="card">
+      <div class="card-header"><span class="card-title">Nuevo asiento contable</span></div>
+      <div class="card-body">
+        <div class="form-row">
+          <div class="form-group"><label class="form-label">Fecha</label><input class="form-input" id="a-fecha" type="date" value="${state.anio}-${String(state.mes).padStart(2,'0')}-01"></div>
+          <div class="form-group"><label class="form-label">Glosa</label><input class="form-input" id="a-glosa" placeholder="Descripción del asiento"></div>
+        </div>
+        <div id="lineas-container"></div>
+        <div class="flex-between" style="margin-top:8px">
+          <button class="btn" onclick="addLinea()">+ Agregar línea</button>
+          <div class="flex gap12" style="font-size:13px">
+            <span>Debe: <strong id="sum-debe">$0</strong></span>
+            <span>Haber: <strong id="sum-haber">$0</strong></span>
+            <span id="sum-diff" style="color:var(--red)"></span>
+          </div>
+        </div>
+        <div style="margin-top:16px;text-align:right">
+          <button class="btn btn-primary" onclick="saveAsiento()">Guardar asiento</button>
+        </div>
+      </div>
+    </div>`;
+
+  window._lineas = [];
+  addLinea(); addLinea();
+}
+
+function addLinea() {
+  window._lineas = window._lineas || [];
+  const id = Date.now();
+  window._lineas.push(id);
+  const optsCuentas = state.cuentas.map(c => `<option value="${c.id}">${c.codigo} — ${c.nombre}</option>`).join('');
+  const div = document.createElement('div');
+  div.id = 'linea-' + id;
+  div.style.cssText = 'display:grid;grid-template-columns:2fr 1fr 1fr auto;gap:8px;margin-bottom:8px;align-items:center';
+  div.innerHTML = `
+    <select class="form-select" id="lc-${id}"><option value="">— Selecciona cuenta —</option>${optsCuentas}</select>
+    <input class="form-input" id="ld-${id}" type="number" placeholder="Debe" oninput="updateSumas()">
+    <input class="form-input" id="lh-${id}" type="number" placeholder="Haber" oninput="updateSumas()">
+    <button class="btn btn-sm btn-danger" onclick="removeLinea(${id})">✕</button>`;
+  document.getElementById('lineas-container').appendChild(div);
+}
+
+function removeLinea(id) {
+  document.getElementById('linea-' + id)?.remove();
+  window._lineas = window._lineas.filter(x => x !== id);
+  updateSumas();
+}
+
+function updateSumas() {
+  let debe = 0, haber = 0;
+  (window._lineas || []).forEach(id => {
+    debe += parseFloat(document.getElementById('ld-'+id)?.value) || 0;
+    haber += parseFloat(document.getElementById('lh-'+id)?.value) || 0;
+  });
+  document.getElementById('sum-debe').textContent = clp(debe);
+  document.getElementById('sum-haber').textContent = clp(haber);
+  const diff = Math.abs(debe - haber);
+  document.getElementById('sum-diff').textContent = diff > 0 ? `Diferencia: ${clp(diff)}` : '✓ Cuadrado';
+  document.getElementById('sum-diff').style.color = diff > 0 ? 'var(--red)' : 'var(--green)';
+}
+
+async function saveAsiento() {
+  const fecha = document.getElementById('a-fecha').value;
+  const glosa = document.getElementById('a-glosa').value.trim();
+  if (!fecha) return showAlert('Ingresa una fecha', 'error');
+  let debe = 0, haber = 0;
+  const lineas = [];
+  for (const id of (window._lineas || [])) {
+    const cuentaId = document.getElementById('lc-'+id)?.value;
+    const d = parseFloat(document.getElementById('ld-'+id)?.value) || 0;
+    const h = parseFloat(document.getElementById('lh-'+id)?.value) || 0;
+    if (!cuentaId || (d === 0 && h === 0)) continue;
+    debe += d; haber += h;
+    lineas.push({ cuenta_id: cuentaId, debe: d, haber: h });
+  }
+  if (lineas.length < 2) return showAlert('Necesitas al menos 2 líneas', 'error');
+  if (Math.abs(debe - haber) > 1) return showAlert('El asiento no cuadra. Verifica Debe = Haber', 'error');
+  const periodoId = await getOrCreatePeriodo();
+  const { data: asiento, error } = await sb.from('asientos').insert({ empresa_id: state.empresaId, periodo_id: periodoId, fecha, glosa: glosa || 'Asiento manual', origen: 'manual' }).select('id').single();
+  if (error) return showAlert('Error: ' + error.message, 'error');
+  const { error: e2 } = await sb.from('asiento_lineas').insert(lineas.map(l => ({ ...l, asiento_id: asiento.id })));
+  if (e2) return showAlert('Error en líneas: ' + e2.message, 'error');
+  showAlert('Asiento guardado correctamente');
+  renderAsientos();
+}
+
+// ─── LIBRO DIARIO ─────────────────────────────────────────────────
+async function renderLibroDiario() {
+  const el = document.getElementById('page-libro-diario');
+  if (!requireEmpresa(el)) return;
+  el.innerHTML = `<div class="loading"><div class="spinner"></div> Cargando...</div>`;
+  const periodoId = await getPeriodoIdSilent();
+  if (!periodoId) { el.innerHTML = `<div class="alert alert-info">No hay movimientos para ${getPeriodoLabel()}.</div>`; return; }
+  const { data: asientos } = await sb.from('asientos').select('*, asiento_lineas(*, cuentas(codigo, nombre))').eq('empresa_id', state.empresaId).eq('periodo_id', periodoId).order('fecha');
+  if (!asientos?.length) { el.innerHTML = `<div class="alert alert-info">No hay asientos para ${getPeriodoLabel()}.</div>`; return; }
+  const origenBadge = { rcv:'badge-blue', honorarios:'badge-amber', banco:'badge-gray', manual:'badge-green' };
+  let html = `<div class="flex-between mb16"><div style="font-size:13px;color:var(--text2)"><strong>${asientos.length}</strong> asientos — ${getPeriodoLabel()}</div></div>`;
+  asientos.forEach(a => {
+    const lineas = a.asiento_lineas || [];
+    const totalDebe = lineas.reduce((s, l) => s + (l.debe || 0), 0);
+    const totalHaber = lineas.reduce((s, l) => s + (l.haber || 0), 0);
+    html += `<div class="asiento-group mb16">
+      <div class="asiento-header">
+        <span>${a.fecha}</span>
+        <strong>${a.glosa}</strong>
+        <span class="badge ${origenBadge[a.origen]||'badge-gray'}">${a.origen}</span>
+        <span style="margin-left:auto">${clp(totalDebe)}</span>
+      </div>
+      <table><thead><tr><th>Cuenta</th><th>Detalle</th><th class="td-num">Debe</th><th class="td-num">Haber</th></tr></thead>
+      <tbody>${lineas.map(l=>`<tr>
+        <td style="font-family:monospace;font-size:12px;width:200px">${l.cuentas?.codigo||''} ${l.cuentas?.nombre||''}</td>
+        <td class="td-muted">${l.glosa||''}</td>
+        <td class="td-num">${l.debe>0?clp(l.debe):'—'}</td>
+        <td class="td-num">${l.haber>0?clp(l.haber):'—'}</td>
+      </tr>`).join('')}
+      <tr style="background:var(--bg)"><td colspan="2" style="font-weight:500;font-size:12px;padding:6px 12px">Totales</td><td class="td-num" style="font-weight:600">${clp(totalDebe)}</td><td class="td-num" style="font-weight:600">${clp(totalHaber)}</td></tr>
+      </tbody></table></div>`;
+  });
+  el.innerHTML = html;
+}
+
+// ─── LIBRO MAYOR ──────────────────────────────────────────────────
+async function renderLibroMayor() {
+  const el = document.getElementById('page-libro-mayor');
+  if (!requireEmpresa(el)) return;
+  el.innerHTML = `<div class="loading"><div class="spinner"></div> Cargando...</div>`;
+  const periodoId = await getPeriodoIdSilent();
+  if (!periodoId) { el.innerHTML = `<div class="alert alert-info">No hay movimientos para ${getPeriodoLabel()}.</div>`; return; }
+  const { data: lineas } = await sb.from('asiento_lineas').select('*, asientos!inner(fecha, glosa, empresa_id, periodo_id), cuentas(id, codigo, nombre, tipo)').eq('asientos.empresa_id', state.empresaId).eq('asientos.periodo_id', periodoId);
+  if (!lineas?.length) { el.innerHTML = `<div class="alert alert-info">No hay movimientos para ${getPeriodoLabel()}.</div>`; return; }
+  const byCuenta = {};
+  lineas.forEach(l => {
+    const key = l.cuenta_id;
+    if (!byCuenta[key]) byCuenta[key] = { cuenta: l.cuentas, lineas: [] };
+    byCuenta[key].lineas.push(l);
+  });
+  let html = `<div class="mb16" style="font-size:13px;color:var(--text2)">Libro Mayor — ${getPeriodoLabel()}</div>`;
+  Object.values(byCuenta).sort((a,b) => (a.cuenta?.codigo||'').localeCompare(b.cuenta?.codigo||'')).forEach(({ cuenta, lineas: ls }) => {
+    const debe = ls.reduce((s, l) => s + (l.debe || 0), 0);
+    const haber = ls.reduce((s, l) => s + (l.haber || 0), 0);
+    const saldo = debe - haber;
+    html += `<div class="card mb16">
+      <div class="card-header">
+        <span class="card-title" style="font-family:monospace">${cuenta?.codigo||''} — ${cuenta?.nombre||''}</span>
+        <span style="font-size:13px;color:var(--text2)">Saldo: <strong style="color:${saldo>=0?'var(--green)':'var(--red)'}">${clp(Math.abs(saldo))}</strong> ${saldo >= 0 ? 'Deudor' : 'Acreedor'}</span>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Fecha</th><th>Glosa</th><th class="td-num">Debe</th><th class="td-num">Haber</th><th class="td-num">Saldo</th></tr></thead>
+          <tbody>
+            ${ls.map((l, i) => {
+              const saldoParcial = ls.slice(0, i+1).reduce((s, x) => s + (x.debe||0) - (x.haber||0), 0);
+              return `<tr>
+                <td class="td-muted">${l.asientos?.fecha||''}</td>
+                <td>${l.asientos?.glosa||''}</td>
+                <td class="td-num">${l.debe>0?clp(l.debe):'—'}</td>
+                <td class="td-num">${l.haber>0?clp(l.haber):'—'}</td>
+                <td class="td-num" style="color:${saldoParcial>=0?'var(--green)':'var(--red)'}">${clp(Math.abs(saldoParcial))}</td>
+              </tr>`;
+            }).join('')}
+            <tr style="background:var(--bg);font-weight:600"><td colspan="2">Total</td><td class="td-num">${clp(debe)}</td><td class="td-num">${clp(haber)}</td><td class="td-num" style="color:${saldo>=0?'var(--green)':'var(--red)'}">${clp(Math.abs(saldo))}</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>`;
+  });
+  el.innerHTML = html;
+}
+
+// ─── F29 ──────────────────────────────────────────────────────────
+async function renderF29() {
+  const el = document.getElementById('page-f29');
+  if (!requireEmpresa(el)) return;
+  el.innerHTML = `<div class="loading"><div class="spinner"></div> Calculando F29...</div>`;
+  const periodoId = await getPeriodoIdSilent();
+  let ivaDebito = 0, ivaCredito = 0, ventasNetas = 0, retenciones = 0;
+  if (periodoId) {
+    const { data: ventas } = await sb.from('rcv_documentos').select('monto_neto, iva').eq('empresa_id', state.empresaId).eq('periodo_id', periodoId).eq('tipo_mov', 'venta');
+    const { data: compras } = await sb.from('rcv_documentos').select('monto_neto, iva').eq('empresa_id', state.empresaId).eq('periodo_id', periodoId).eq('tipo_mov', 'compra');
+    const { data: hons } = await sb.from('honorarios').select('retencion').eq('empresa_id', state.empresaId).eq('periodo_id', periodoId);
+    ventasNetas = (ventas||[]).reduce((s,r) => s + (r.monto_neto||0), 0);
+    ivaDebito = (ventas||[]).reduce((s,r) => s + (r.iva||0), 0);
+    ivaCredito = (compras||[]).reduce((s,r) => s + (r.iva||0), 0);
+    retenciones = (hons||[]).reduce((s,r) => s + (r.retencion||0), 0);
+  }
+  const emp = state.empresas.find(e => e.id === state.empresaId);
+  const tasaPPM = emp?.tasa_ppm || 0.25;
+  const ppm = Math.round(ventasNetas * tasaPPM / 100);
+  const ivaAPagar = Math.max(0, ivaDebito - ivaCredito);
+  const remanente = ivaCredito > ivaDebito ? ivaCredito - ivaDebito : 0;
+  const totalF29 = ivaAPagar + ppm - retenciones;
+
+  el.innerHTML = `
+    <div class="grid2" style="gap:20px">
+      <div>
+        <div class="card mb16">
+          <div class="card-header"><span class="card-title">IVA</span></div>
+          <div class="card-body">
+            <div class="f29-row"><span class="f29-label">Ventas netas del período</span><span class="f29-value">${clp(ventasNetas)}</span></div>
+            <div class="f29-row"><span class="f29-label">IVA Débito Fiscal (ventas × 19%)</span><span class="f29-value" style="color:var(--red)">${clp(ivaDebito)}</span></div>
+            <div class="f29-row"><span class="f29-label">IVA Crédito Fiscal (compras)</span><span class="f29-value" style="color:var(--green)">− ${clp(ivaCredito)}</span></div>
+            <div class="f29-row"><span class="f29-label" style="font-weight:600">IVA a pagar</span><span class="f29-value">${clp(ivaAPagar)}</span></div>
+            ${remanente > 0 ? `<div class="alert alert-info" style="margin-top:8px;margin-bottom:0">Remanente IVA CF: ${clp(remanente)}</div>` : ''}
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header"><span class="card-title">PPM y Retenciones</span></div>
+          <div class="card-body">
+            <div class="f29-row"><span class="f29-label">Ventas netas</span><span class="f29-value">${clp(ventasNetas)}</span></div>
+            <div class="f29-row"><span class="f29-label">Tasa PPM (${tasaPPM}%)</span><span class="f29-value">${clp(ppm)}</span></div>
+            <div class="f29-row"><span class="f29-label">Retenciones honorarios</span><span class="f29-value" style="color:var(--green)">− ${clp(retenciones)}</span></div>
+          </div>
+        </div>
+      </div>
+      <div>
+        <div class="card">
+          <div class="card-header"><span class="card-title">Total a declarar en F29</span></div>
+          <div class="card-body">
+            <div class="f29-row"><span class="f29-label">IVA a pagar</span><span class="f29-value">${clp(ivaAPagar)}</span></div>
+            <div class="f29-row"><span class="f29-label">PPM</span><span class="f29-value">${clp(ppm)}</span></div>
+            <div class="f29-row"><span class="f29-label">Retenciones 2da categoría</span><span class="f29-value" style="color:var(--green)">− ${clp(retenciones)}</span></div>
+            <div class="f29-total">
+              <span class="f29-total-label">Total F29</span>
+              <span class="f29-total-value" style="color:${totalF29 >= 0 ? 'var(--red)' : 'var(--green)'}">${clp(Math.abs(totalF29))}</span>
+            </div>
+            ${totalF29 < 0 ? `<div class="alert alert-success" style="margin-top:12px">Saldo a favor: ${clp(Math.abs(totalF29))}</div>` : ''}
+            <div style="margin-top:16px;font-size:12px;color:var(--text3)">
+              Período: <strong>${getPeriodoLabel()}</strong> — ${state.empresaNombre}<br>
+              Generado: ${new Date().toLocaleDateString('es-CL')}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>`;
+}
+
+// ─── BALANCE 8 COLUMNAS ───────────────────────────────────────────
+async function renderBalance() {
+  const el = document.getElementById('page-balance');
+  if (!requireEmpresa(el)) return;
+  el.innerHTML = `<div class="loading"><div class="spinner"></div> Generando balance...</div>`;
+  if (!state.cuentas.length) await loadCuentas();
+  const periodoId = await getPeriodoIdSilent();
+  if (!periodoId) { el.innerHTML = `<div class="alert alert-info">No hay movimientos para ${getPeriodoLabel()}.</div>`; return; }
+  const { data: lineas } = await sb.from('asiento_lineas').select('*, asientos!inner(empresa_id, periodo_id), cuenta_id, cuentas(codigo, nombre, tipo)').eq('asientos.empresa_id', state.empresaId).eq('asientos.periodo_id', periodoId);
+  const saldos = {};
+  (lineas || []).forEach(l => {
+    const key = l.cuenta_id;
+    if (!saldos[key]) saldos[key] = { cuenta: l.cuentas, debe: 0, haber: 0 };
+    saldos[key].debe += l.debe || 0;
+    saldos[key].haber += l.haber || 0;
+  });
+
+  let totalDebeSum = 0, totalHaberSum = 0;
+  let activoDeudor = 0, activoAcreedor = 0, pasivoDeudor = 0, pasivoAcreedor = 0;
+  let ingresosHaber = 0, egresosDebe = 0;
+
+  const rows = Object.values(saldos).sort((a, b) => (a.cuenta?.codigo||'').localeCompare(b.cuenta?.codigo||'')).map(({ cuenta, debe, haber }) => {
+    const saldo = debe - haber;
+    const deudor = saldo > 0 ? saldo : 0;
+    const acreedor = saldo < 0 ? Math.abs(saldo) : 0;
+    totalDebeSum += debe; totalHaberSum += haber;
+    if (cuenta?.tipo === 'activo') { activoDeudor += deudor; activoAcreedor += acreedor; }
+    if (cuenta?.tipo === 'pasivo' || cuenta?.tipo === 'patrimonio') { pasivoDeudor += deudor; pasivoAcreedor += acreedor; }
+    if (cuenta?.tipo === 'ingreso') ingresosHaber += haber;
+    if (cuenta?.tipo === 'egreso') egresosDebe += debe;
+    return `<tr>
+      <td style="font-size:11px;font-family:monospace">${cuenta?.codigo||''}</td>
+      <td style="font-size:12px">${cuenta?.nombre||''}</td>
+      <td class="td-num">${debe>0?clp(debe):''}</td>
+      <td class="td-num">${haber>0?clp(haber):''}</td>
+      <td class="td-num" style="color:var(--green)">${deudor>0?clp(deudor):''}</td>
+      <td class="td-num" style="color:var(--red)">${acreedor>0?clp(acreedor):''}</td>
+      <td class="td-num">${cuenta?.tipo==='activo'&&deudor>0?clp(deudor):''}</td>
+      <td class="td-num">${(cuenta?.tipo==='pasivo'||cuenta?.tipo==='patrimonio')&&acreedor>0?clp(acreedor):''}</td>
+    </tr>`;
+  }).join('');
+
+  const utilidad = ingresosHaber - egresosDebe;
+
+  el.innerHTML = `
+    <div class="flex-between mb16">
+      <div style="font-size:13px;color:var(--text2)">${state.empresaNombre} — Balance ${getPeriodoLabel()}</div>
+    </div>
+    <div class="card">
+      <div class="card-header"><span class="card-title">Balance de 8 columnas</span></div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th rowspan="2" style="width:70px">Código</th>
+              <th rowspan="2">Cuenta</th>
+              <th colspan="2" style="text-align:center;border-bottom:1px solid var(--border)">Movimientos</th>
+              <th colspan="2" style="text-align:center;border-bottom:1px solid var(--border)">Saldos</th>
+              <th colspan="2" style="text-align:center;border-bottom:1px solid var(--border)">Balance</th>
+            </tr>
+            <tr>
+              <th class="td-num">Debe</th><th class="td-num">Haber</th>
+              <th class="td-num">Deudor</th><th class="td-num">Acreedor</th>
+              <th class="td-num">Activo</th><th class="td-num">Pasivo/Pat.</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rows}
+            <tr style="background:var(--bg);font-weight:600">
+              <td colspan="2">Totales</td>
+              <td class="td-num">${clp(totalDebeSum)}</td><td class="td-num">${clp(totalHaberSum)}</td>
+              <td class="td-num">${clp(activoDeudor+pasivoDeudor)}</td><td class="td-num">${clp(activoAcreedor+pasivoAcreedor)}</td>
+              <td class="td-num">${clp(activoDeudor)}</td><td class="td-num">${clp(pasivoAcreedor)}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="grid2 mt16" style="margin-top:16px;gap:16px">
+      <div class="metric"><div class="metric-label">Utilidad del período</div><div class="metric-value ${utilidad>=0?'green':'red'}">${clp(utilidad)}</div></div>
+      <div class="metric"><div class="metric-label">Ingresos / Egresos</div><div class="metric-value">${clp(ingresosHaber)} / ${clp(egresosDebe)}</div></div>
+    </div>`;
+}
+
+// ─── EERR ─────────────────────────────────────────────────────────
+async function renderEERR() {
+  const el = document.getElementById('page-eerr');
+  if (!requireEmpresa(el)) return;
+  el.innerHTML = `<div class="loading"><div class="spinner"></div> Generando EERR...</div>`;
+  const periodoId = await getPeriodoIdSilent();
+  if (!periodoId) { el.innerHTML = `<div class="alert alert-info">No hay movimientos para ${getPeriodoLabel()}.</div>`; return; }
+  const { data: lineas } = await sb.from('asiento_lineas').select('*, asientos!inner(empresa_id, periodo_id), cuentas(codigo, nombre, tipo, subtipo)').eq('asientos.empresa_id', state.empresaId).eq('asientos.periodo_id', periodoId);
+  const saldos = {};
+  (lineas || []).forEach(l => {
+    if (!l.cuentas) return;
+    const { tipo, codigo, nombre } = l.cuentas;
+    if (tipo !== 'ingreso' && tipo !== 'egreso') return;
+    if (!saldos[l.cuenta_id]) saldos[l.cuenta_id] = { codigo, nombre, tipo, debe: 0, haber: 0 };
+    saldos[l.cuenta_id].debe += l.debe || 0;
+    saldos[l.cuenta_id].haber += l.haber || 0;
+  });
+  const ingresos = Object.values(saldos).filter(s => s.tipo === 'ingreso');
+  const egresos = Object.values(saldos).filter(s => s.tipo === 'egreso');
+  const totalIngresos = ingresos.reduce((s, x) => s + x.haber, 0);
+  const totalEgresos = egresos.reduce((s, x) => s + x.debe, 0);
+  const utilidad = totalIngresos - totalEgresos;
+  const pct = n => totalIngresos > 0 ? ((n / totalIngresos) * 100).toFixed(1) + '%' : '—';
+
+  el.innerHTML = `
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">Estado de Resultados — ${getPeriodoLabel()}</span>
+        <span style="font-size:12px;color:var(--text2)">${state.empresaNombre}</span>
+      </div>
+      <div class="card-body" style="max-width:600px">
+        <div style="font-size:12px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">Ingresos</div>
+        ${ingresos.map(i => `<div class="f29-row"><span class="f29-label">${i.codigo} — ${i.nombre}</span><div class="flex gap12"><span class="text-muted">${pct(i.haber)}</span><span class="f29-value" style="color:var(--green)">${clp(i.haber)}</span></div></div>`).join('')}
+        <div class="f29-row" style="border-top:2px solid var(--border);font-weight:700"><span>Total ingresos</span><span class="f29-value" style="color:var(--green)">${clp(totalIngresos)}</span></div>
+        <div style="font-size:12px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.06em;margin:16px 0 10px">Egresos</div>
+        ${egresos.map(e => `<div class="f29-row"><span class="f29-label">${e.codigo} — ${e.nombre}</span><div class="flex gap12"><span class="text-muted">${pct(e.debe)}</span><span class="f29-value" style="color:var(--red)">${clp(e.debe)}</span></div></div>`).join('')}
+        <div class="f29-row" style="border-top:2px solid var(--border);font-weight:700"><span>Total egresos</span><span class="f29-value" style="color:var(--red)">${clp(totalEgresos)}</span></div>
+        <div class="f29-total" style="margin-top:16px">
+          <span class="f29-total-label">${utilidad >= 0 ? 'Utilidad' : 'Pérdida'} del período</span>
+          <span class="f29-total-value" style="color:${utilidad>=0?'var(--green)':'var(--red)'}">${clp(Math.abs(utilidad))}</span>
+        </div>
+        ${totalIngresos > 0 ? `<div class="text-muted" style="margin-top:8px;text-align:right">Margen: ${pct(utilidad)}</div>` : ''}
+      </div>
+    </div>`;
+}
+
+// ─── MODAL ────────────────────────────────────────────────────────
+function showModal(title, body, onSave) {
+  const overlay = document.getElementById('modal-overlay');
+  document.getElementById('modal-content').innerHTML = `
+    <div class="modal-header">
+      <span class="modal-title">${title}</span>
+      <button class="btn btn-sm" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body">${body}</div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal()">Cancelar</button>
+      <button class="btn btn-primary" id="modal-save-btn">Guardar</button>
+    </div>`;
+  document.getElementById('modal-save-btn').onclick = onSave;
+  overlay.classList.remove('hidden');
+}
+function closeModal() { document.getElementById('modal-overlay').classList.add('hidden'); }
+function closeModalOverlay(e) { if (e.target === document.getElementById('modal-overlay')) closeModal(); }
+
+// ─── START ────────────────────────────────────────────────────────
+init();
+</script>
+</body>
+</html>
