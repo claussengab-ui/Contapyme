@@ -1621,29 +1621,83 @@ async function renderHistorial() {
     const ivaDebito = (rcvVentas||[]).reduce((s,r) => s + r.iva, 0);
     const ivaCredito = (rcvCompras||[]).reduce((s,r) => s + r.iva, 0);
 
+    const pid = p.id;
+    const mesLabel = `${meses[p.mes]} ${p.anio}`;
     html += `
     <div class="card mb16">
       <div class="card-header">
-        <span class="card-title">${meses[p.mes]} ${p.anio}</span>
+        <span class="card-title">${mesLabel}</span>
         <div class="flex gap8">
           <span class="badge badge-blue">${(rcvCompras||[]).length} compras</span>
           <span class="badge badge-green">${(rcvVentas||[]).length} ventas</span>
           ${hons?.length ? `<span class="badge badge-amber">${hons.length} honorarios</span>` : ''}
-          <button class="btn btn-sm" onclick="exportarPeriodo('${p.id}','${meses[p.mes]} ${p.anio}')">Exportar CSV</button>
+          <button class="btn btn-sm" onclick="toggleDetalle('det-${pid}')">Ver documentos</button>
+          <button class="btn btn-sm" onclick="exportarPeriodo('${pid}','${mesLabel}')">Exportar CSV</button>
         </div>
       </div>
       <div class="card-body">
-        <div class="grid4">
+        <div class="grid4 mb16">
           <div class="metric"><div class="metric-label">Ventas totales</div><div class="metric-value green" style="font-size:16px">${clp(totalVentas)}</div></div>
           <div class="metric"><div class="metric-label">Compras totales</div><div class="metric-value" style="font-size:16px">${clp(totalCompras)}</div></div>
           <div class="metric"><div class="metric-label">Honorarios</div><div class="metric-value" style="font-size:16px">${clp(totalHon)}</div></div>
           <div class="metric"><div class="metric-label">IVA neto F29</div><div class="metric-value ${ivaDebito-ivaCredito>0?'red':'green'}" style="font-size:16px">${clp(Math.abs(ivaDebito-ivaCredito))}</div></div>
+        </div>
+        <div id="det-${pid}" style="display:none">
+          <div class="loading" id="load-${pid}"><div class="spinner"></div> Cargando...</div>
         </div>
       </div>
     </div>`;
   }
 
   el.innerHTML = html;
+}
+
+function toggleDetalle(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  if (el.style.display === 'none') {
+    el.style.display = 'block';
+    cargarDetalleperiodo(id.replace('det-',''), id);
+  } else {
+    el.style.display = 'none';
+  }
+}
+
+async function cargarDetalleperiodo(periodoId, containerId) {
+  const el = document.getElementById(containerId);
+  if (!el || el.dataset.loaded) return;
+  const { data: ventas } = await sb.from('rcv_documentos').select('*').eq('periodo_id', periodoId).eq('tipo_mov','venta').order('fecha_docto');
+  const { data: compras } = await sb.from('rcv_documentos').select('*').eq('periodo_id', periodoId).eq('tipo_mov','compra').order('fecha_docto');
+  const { data: hons } = await sb.from('honorarios').select('*').eq('periodo_id', periodoId);
+  let html = '';
+  if (ventas?.length) {
+    html += `<p style="font-size:12px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Ventas (${ventas.length})</p>
+    <div class="table-wrap" style="margin-bottom:16px"><table>
+      <thead><tr><th>Fecha</th><th>RUT</th><th>Cliente</th><th>Folio</th><th class="td-num">Neto</th><th class="td-num">IVA</th><th class="td-num">Total</th></tr></thead>
+      <tbody>${ventas.map(r=>`<tr><td class="td-muted">${r.fecha_docto||'—'}</td><td class="td-muted">${r.rut_contraparte||'—'}</td><td>${r.razon_contraparte||'—'}</td><td class="td-muted">${r.folio||'—'}</td><td class="td-num">${clp(r.monto_neto)}</td><td class="td-num td-muted">${clp(r.iva)}</td><td class="td-num">${clp(r.monto_total)}</td></tr>`).join('')}
+      <tr style="background:var(--bg);font-weight:600"><td colspan="4">Total</td><td class="td-num">${clp(ventas.reduce((s,r)=>s+r.monto_neto,0))}</td><td class="td-num">${clp(ventas.reduce((s,r)=>s+r.iva,0))}</td><td class="td-num">${clp(ventas.reduce((s,r)=>s+r.monto_total,0))}</td></tr>
+      </tbody></table></div>`;
+  }
+  if (compras?.length) {
+    html += `<p style="font-size:12px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Compras (${compras.length})</p>
+    <div class="table-wrap" style="margin-bottom:16px"><table>
+      <thead><tr><th>Fecha</th><th>RUT</th><th>Proveedor</th><th>Folio</th><th class="td-num">Neto</th><th class="td-num">IVA</th><th class="td-num">Total</th></tr></thead>
+      <tbody>${compras.map(r=>`<tr><td class="td-muted">${r.fecha_docto||'—'}</td><td class="td-muted">${r.rut_contraparte||'—'}</td><td>${r.razon_contraparte||'—'}</td><td class="td-muted">${r.folio||'—'}</td><td class="td-num">${clp(r.monto_neto)}</td><td class="td-num td-muted">${clp(r.iva)}</td><td class="td-num">${clp(r.monto_total)}</td></tr>`).join('')}
+      <tr style="background:var(--bg);font-weight:600"><td colspan="4">Total</td><td class="td-num">${clp(compras.reduce((s,r)=>s+r.monto_neto,0))}</td><td class="td-num">${clp(compras.reduce((s,r)=>s+r.iva,0))}</td><td class="td-num">${clp(compras.reduce((s,r)=>s+r.monto_total,0))}</td></tr>
+      </tbody></table></div>`;
+  }
+  if (hons?.length) {
+    html += `<p style="font-size:12px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Honorarios (${hons.length})</p>
+    <div class="table-wrap"><table>
+      <thead><tr><th>RUT</th><th>Nombre</th><th class="td-num">Bruto</th><th class="td-num">Retención</th><th class="td-num">Líquido</th></tr></thead>
+      <tbody>${hons.map(h=>`<tr><td class="td-muted">${h.rut_trabajador||'—'}</td><td>${h.nombre_trabajador||'—'}</td><td class="td-num">${clp(h.monto_bruto)}</td><td class="td-num" style="color:var(--red)">${clp(h.retencion)}</td><td class="td-num" style="color:var(--green)">${clp(h.monto_liquido)}</td></tr>`).join('')}
+      <tr style="background:var(--bg);font-weight:600"><td colspan="2">Total</td><td class="td-num">${clp(hons.reduce((s,h)=>s+h.monto_bruto,0))}</td><td class="td-num" style="color:var(--red)">${clp(hons.reduce((s,h)=>s+h.retencion,0))}</td><td class="td-num" style="color:var(--green)">${clp(hons.reduce((s,h)=>s+h.monto_liquido,0))}</td></tr>
+      </tbody></table></div>`;
+  }
+  if (!html) html = '<div class="empty" style="padding:12px"><div class="empty-title">Sin documentos</div></div>';
+  document.getElementById('load-' + periodoId)?.remove();
+  el.innerHTML = html;
+  el.dataset.loaded = '1';
 }
 
 async function exportarPeriodo(periodoId, label) {
