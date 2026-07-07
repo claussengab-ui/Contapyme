@@ -8,11 +8,21 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <style>
 @media print {
-  body * { visibility: hidden; }
-  #reporte-print, #reporte-print * { visibility: visible; }
-  #reporte-print { position: fixed; top: 0; left: 0; width: 100%; box-shadow: none !important; border-radius: 0 !important; }
-  body { background: white !important; }
+  body * { visibility: hidden !important; }
+  #reporte-print * { visibility: visible !important; }
+  #reporte-print {
+    visibility: visible !important;
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+  }
+  body { background: white !important; margin: 0 !important; }
+  @page { margin: 1cm; }
 }
+:root {
   --bg: #f0f4f8;
   --surface: #ffffff;
   --surface2: #f8fafc;
@@ -2272,9 +2282,9 @@ async function renderReporte(mesReporte, anioReporte) {
           <div style="font-size:14px;font-weight:600;margin-bottom:12px;color:#1e293b">🧾 Impuestos del mes (F29)</div>
           <div style="border:1px solid #e2e8f0;border-radius:10px;overflow:hidden">
             <div style="display:flex;justify-content:space-between;padding:10px 16px;border-bottom:1px solid #e2e8f0;font-size:13px"><span style="color:#475569">IVA débito fiscal (ventas)</span><span>${clp(ivaDebito)}</span></div>
-            ${ncVentaIva > 0 ? `<div style="display:flex;justify-content:space-between;padding:10px 16px;border-bottom:1px solid #e2e8f0;font-size:13px"><span style="color:#475569">NC emitidas (reduce débito)</span><span style="color:#dc2626">− ${clp(ncVentaIva)}</span></div>` : ''}
+            ${ncVentaIva > 0 ? `<div style="display:flex;justify-content:space-between;padding:10px 16px;border-bottom:1px solid #e2e8f0;font-size:13px"><span style="color:#475569">NC emitidas (reduce débito)</span><span style="color:#16a34a">− ${clp(ncVentaIva)}</span></div>` : ''}
             <div style="display:flex;justify-content:space-between;padding:10px 16px;border-bottom:1px solid #e2e8f0;font-size:13px"><span style="color:#475569">IVA crédito fiscal (compras)</span><span style="color:#16a34a">− ${clp(ivaCreditoBruto)}</span></div>
-            ${ncCompraIva > 0 ? `<div style="display:flex;justify-content:space-between;padding:10px 16px;border-bottom:1px solid #e2e8f0;font-size:13px"><span style="color:#475569">NC recibidas (reduce crédito)</span><span style="color:#dc2626">+ ${clp(ncCompraIva)}</span></div>` : ''}
+            ${ncCompraIva > 0 ? `<div style="display:flex;justify-content:space-between;padding:10px 16px;border-bottom:1px solid #e2e8f0;font-size:13px;background:#fff7ed"><span style="color:#92400e">NC recibidas (reduce crédito)</span><span style="color:#92400e">+ ${clp(ncCompraIva)} → crédito neto: ${clp(ivaCredito)}</span></div>` : ''}
             ${remanteAnteriorRep > 0 ? `<div style="display:flex;justify-content:space-between;padding:10px 16px;border-bottom:1px solid #e2e8f0;font-size:13px;background:#eff6ff"><span style="color:#2563eb">Remanente IVA meses anteriores</span><span style="color:#2563eb">− ${clp(remanteAnteriorRep)}</span></div>` : ''}
             <div style="display:flex;justify-content:space-between;padding:10px 16px;border-bottom:1px solid #e2e8f0;font-size:13px"><span style="color:#475569">PPM (${emp?.tasa_ppm || 0.25}%)</span><span>${clp(ppm)}</span></div>
             ${totalRet > 0 ? `<div style="display:flex;justify-content:space-between;padding:10px 16px;border-bottom:1px solid #e2e8f0;font-size:13px"><span style="color:#475569">Retenciones honorarios</span><span style="color:#16a34a">− ${clp(totalRet)}</span></div>` : ''}
