@@ -2125,12 +2125,13 @@ async function renderReporte() {
   const mesLabel = `${meses[state.mes]} ${state.anio}`;
   const emp = state.empresas.find(e => e.id === state.empresaId);
 
-  let ventas = [], compras = [], hons = [];
+  let ventas = [], compras = [], hons = [], ncs = [];
   if (periodoId) {
     const r1 = await sb.from('rcv_documentos').select('*').eq('empresa_id', state.empresaId).eq('periodo_id', periodoId).eq('tipo_mov', 'venta');
     const r2 = await sb.from('rcv_documentos').select('*').eq('empresa_id', state.empresaId).eq('periodo_id', periodoId).eq('tipo_mov', 'compra');
     const r3 = await sb.from('honorarios').select('*').eq('empresa_id', state.empresaId).eq('periodo_id', periodoId);
-    ventas = r1.data || []; compras = r2.data || []; hons = r3.data || [];
+    const r4 = await sb.from('notas_credito').select('*').eq('empresa_id', state.empresaId).eq('periodo_id', periodoId);
+    ventas = r1.data || []; compras = r2.data || []; hons = r3.data || []; ncs = r4.data || [];
   }
 
   const totalVentasNeto = ventas.reduce((s,r) => s + r.monto_neto, 0);
@@ -2138,14 +2139,19 @@ async function renderReporte() {
   const totalComprasNeto = compras.reduce((s,r) => s + r.monto_neto, 0);
   const totalComprasTotal = compras.reduce((s,r) => s + r.monto_total, 0);
   const ivaDebito = ventas.reduce((s,r) => s + r.iva, 0);
-  const ivaCredito = compras.reduce((s,r) => s + r.iva, 0);
+  const ivaCreditoBruto = compras.reduce((s,r) => s + r.iva, 0);
+  // Restar NC recibidas (reducen crédito fiscal) y NC emitidas (reducen débito fiscal)
+  const ncCompraIva = ncs.filter(n => n.tipo_mov === 'compra').reduce((s,n) => s + n.iva, 0);
+  const ncVentaIva = ncs.filter(n => n.tipo_mov === 'venta').reduce((s,n) => s + n.iva, 0);
+  const ivaCredito = ivaCreditoBruto - ncCompraIva;
+  const ivaDebitoNeto = ivaDebito - ncVentaIva;
   const totalHon = hons.reduce((s,h) => s + h.monto_bruto, 0);
   const totalRet = hons.reduce((s,h) => s + h.retencion, 0);
   const resultado = totalVentasNeto - totalComprasNeto - totalHon;
   const remanteAnteriorRep = await calcularRemanteAcumulado(state.anio, state.mes);
   const creditoTotal = ivaCredito + remanteAnteriorRep;
-  const ivaPagar = Math.max(0, ivaDebito - creditoTotal);
-  const remanente = creditoTotal > ivaDebito ? creditoTotal - ivaDebito : 0;
+  const ivaPagar = Math.max(0, ivaDebitoNeto - creditoTotal);
+  const remanente = creditoTotal > ivaDebitoNeto ? creditoTotal - ivaDebitoNeto : 0;
   const ppm = Math.round(totalVentasNeto * (emp?.tasa_ppm || 0.25) / 100);
   const totalF29 = ivaPagar + ppm - totalRet;
   const margen = totalVentasNeto > 0 ? ((resultado / totalVentasNeto) * 100).toFixed(1) : 0;
@@ -2247,7 +2253,9 @@ async function renderReporte() {
           <div style="font-size:14px;font-weight:600;margin-bottom:12px;color:#1e293b">🧾 Impuestos del mes (F29)</div>
           <div style="border:1px solid #e2e8f0;border-radius:10px;overflow:hidden">
             <div style="display:flex;justify-content:space-between;padding:10px 16px;border-bottom:1px solid #e2e8f0;font-size:13px"><span style="color:#475569">IVA débito fiscal (ventas)</span><span>${clp(ivaDebito)}</span></div>
-            <div style="display:flex;justify-content:space-between;padding:10px 16px;border-bottom:1px solid #e2e8f0;font-size:13px"><span style="color:#475569">IVA crédito fiscal (compras)</span><span style="color:#16a34a">− ${clp(ivaCredito)}</span></div>
+            ${ncVentaIva > 0 ? `<div style="display:flex;justify-content:space-between;padding:10px 16px;border-bottom:1px solid #e2e8f0;font-size:13px"><span style="color:#475569">NC emitidas (reduce débito)</span><span style="color:#dc2626">− ${clp(ncVentaIva)}</span></div>` : ''}
+            <div style="display:flex;justify-content:space-between;padding:10px 16px;border-bottom:1px solid #e2e8f0;font-size:13px"><span style="color:#475569">IVA crédito fiscal (compras)</span><span style="color:#16a34a">− ${clp(ivaCreditoBruto)}</span></div>
+            ${ncCompraIva > 0 ? `<div style="display:flex;justify-content:space-between;padding:10px 16px;border-bottom:1px solid #e2e8f0;font-size:13px"><span style="color:#475569">NC recibidas (reduce crédito)</span><span style="color:#dc2626">+ ${clp(ncCompraIva)}</span></div>` : ''}
             ${remanteAnteriorRep > 0 ? `<div style="display:flex;justify-content:space-between;padding:10px 16px;border-bottom:1px solid #e2e8f0;font-size:13px;background:#eff6ff"><span style="color:#2563eb">Remanente IVA meses anteriores</span><span style="color:#2563eb">− ${clp(remanteAnteriorRep)}</span></div>` : ''}
             <div style="display:flex;justify-content:space-between;padding:10px 16px;border-bottom:1px solid #e2e8f0;font-size:13px"><span style="color:#475569">PPM (${emp?.tasa_ppm || 0.25}%)</span><span>${clp(ppm)}</span></div>
             ${totalRet > 0 ? `<div style="display:flex;justify-content:space-between;padding:10px 16px;border-bottom:1px solid #e2e8f0;font-size:13px"><span style="color:#475569">Retenciones honorarios</span><span style="color:#16a34a">− ${clp(totalRet)}</span></div>` : ''}
