@@ -7,7 +7,15 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <style>
-:root {
+@media print {
+  .sidebar, .topbar, .flex-between .flex, #page-title { display: none !important; }
+  .main { margin-left: 0 !important; }
+  .page { padding: 0 !important; }
+  .tab-panel { display: block !important; }
+  #page-reporte > .flex-between { display: none !important; }
+  #reporte-print { box-shadow: none !important; max-width: 100% !important; }
+  body { background: white !important; }
+}
   --bg: #f7f6f3;
   --surface: #ffffff;
   --surface2: #f0efe9;
@@ -236,6 +244,23 @@ tr:hover td { background: var(--bg); }
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
         Est. Resultados
       </a>
+      <a class="nav-item" onclick="navigate('reporte')" href="#">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="15" y2="17"/><polyline points="9 9 10 9 12 9"/></svg>
+        Reporte cliente
+      </a>
+      <a class="nav-item" onclick="navigate('reporte-anual')" href="#">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+        Reporte anual
+      </a>
+      <div class="nav-section">Gestión</div>
+      <a class="nav-item" onclick="navigate('depreciacion')" href="#">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+        Depreciación
+      </a>
+      <a class="nav-item" onclick="navigate('periodos')" href="#">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        Períodos / Cierre
+      </a>
       <a class="nav-item" onclick="navigate('historial')" href="#">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
         Historial
@@ -291,6 +316,10 @@ tr:hover td { background: var(--bg); }
       <div id="page-balance" class="tab-panel"></div>
       <div id="page-eerr" class="tab-panel"></div>
       <div id="page-historial" class="tab-panel"></div>
+      <div id="page-reporte" class="tab-panel"></div>
+      <div id="page-reporte-anual" class="tab-panel"></div>
+      <div id="page-depreciacion" class="tab-panel"></div>
+      <div id="page-periodos" class="tab-panel"></div>
       <div id="page-consultor" class="tab-panel"></div>
     </div>
   </div>
@@ -387,7 +416,11 @@ function navigate(page) {
     'importar-banco':'Importar cartola bancaria','asientos':'Asiento manual',
     'libro-diario':'Libro diario','libro-mayor':'Libro mayor',
     'f29':'Formulario 29','balance':'Balance 8 columnas','eerr':'Estado de resultados',
-    'historial':'Historial de documentos','consultor':'Consultor IA'
+    'historial':'Historial de documentos','consultor':'Consultor IA',
+    'reporte':'Reporte mensual cliente',
+    'reporte-anual':'Reporte anual — Operación Renta',
+    'depreciacion':'Depreciación de activos',
+    'periodos':'Períodos contables / Cierre'
   };
   document.getElementById('page-title').textContent = titles[page] || page;
   const renders = {
@@ -397,7 +430,11 @@ function navigate(page) {
     'asientos': renderAsientos, 'libro-diario': renderLibroDiario,
     'libro-mayor': renderLibroMayor, 'f29': renderF29,
     'balance': renderBalance, 'eerr': renderEERR,
-    'historial': renderHistorial, 'consultor': renderConsultor
+    'historial': renderHistorial, 'consultor': renderConsultor,
+    'reporte': renderReporte,
+    'reporte-anual': renderReporteAnual,
+    'depreciacion': renderDepreciacion,
+    'periodos': renderPeriodos
   };
   if (renders[page]) renders[page]();
 }
@@ -578,15 +615,17 @@ function newEmpresa() {
           <option value="14D8">14 D8 — Propyme Transparente</option>
         </select>
       </div>
-      <div class="form-group"><label class="form-label">Tasa PPM (%)</label><input class="form-input" id="m-ppm" type="number" step="0.01" value="0.25" placeholder="0.25"></div>
-    </div>`,
+      <div class="form-group"><label class="form-label">Tasa PPM (%)</label><input class="form-input" id="m-ppm" type="number" step="0.001" value="0.25" placeholder="0.25"></div>
+    </div>
+    <div class="form-group"><label class="form-label">Logo empresa (opcional)</label><input class="form-input" id="m-logo" type="url" placeholder="https://... URL de imagen del logo"></div>`,
     async () => {
       const rut = document.getElementById('m-rut').value.trim();
       const rs = document.getElementById('m-rs').value.trim();
       const reg = document.getElementById('m-reg').value;
       const ppm = parseFloat(document.getElementById('m-ppm').value) || 0;
+      const logo = document.getElementById('m-logo').value.trim();
       if (!rut || !rs) return showAlert('Completa RUT y razón social', 'error');
-      const { error } = await sb.from('empresas').insert({ rut, razon_social: rs, regimen: reg, tasa_ppm: ppm });
+      const { error } = await sb.from('empresas').insert({ rut, razon_social: rs, regimen: reg, tasa_ppm: ppm, logo_url: logo || null });
       if (error) return showAlert('Error: ' + error.message, 'error');
       await loadEmpresas();
       closeModal();
@@ -608,7 +647,7 @@ async function editEmpresa(id) {
           <option value="14D8" ${e.regimen==='14D8'?'selected':''}>14 D8 — Propyme Transparente</option>
         </select>
       </div>
-      <div class="form-group"><label class="form-label">Tasa PPM (%)</label><input class="form-input" id="m-ppm" type="number" step="0.01" value="${e.tasa_ppm || 0}"></div>
+      <div class="form-group"><label class="form-label">Tasa PPM (%)</label><input class="form-input" id="m-ppm" type="number" step="0.001" value="${e.tasa_ppm || 0}"></div>
     </div>`,
     async () => {
       const rut = document.getElementById('m-rut').value.trim();
@@ -773,19 +812,176 @@ function renderImportarRCV() {
       </div>
       <div>
         <h3 style="font-size:14px;font-weight:600;margin-bottom:8px">Ventas (RCV)</h3>
+        <div style="display:flex;gap:8px;margin-bottom:10px">
+          <button class="btn btn-sm" id="btn-venta-detalle" onclick="setVentaMode('detalle')" style="flex:1;justify-content:center;background:var(--accent);border-color:var(--accent);color:#fff">Registro/Detalle</button>
+          <button class="btn btn-sm" id="btn-venta-resumen" onclick="setVentaMode('resumen')" style="flex:1;justify-content:center">Resumen (voucher)</button>
+        </div>
         <div class="upload-zone" id="drop-ventas" onclick="document.getElementById('file-ventas').click()"
           ondragover="this.classList.add('drag');event.preventDefault()"
           ondragleave="this.classList.remove('drag')"
-          ondrop="handleDrop(event,'ventas')">
+          ondrop="handleDropVentas(event)">
           <svg class="upload-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-          <div class="upload-text">Arrastrar RCV_VENTA_*.csv</div>
-          <div class="upload-sub">o hacer clic para seleccionar</div>
+          <div class="upload-text" id="venta-upload-text">Arrastrar RCV_VENTA_REGISTRO_*.csv</div>
+          <div class="upload-sub" id="venta-upload-sub">Detalle por factura/boleta emitida</div>
         </div>
-        <input type="file" id="file-ventas" accept=".csv" class="hidden" onchange="processRCV(this.files[0],'venta')">
+        <input type="file" id="file-ventas" accept=".csv" class="hidden" onchange="detectarYProcesarVentas(this.files[0])">
       </div>
     </div>
     <div id="rcv-status"></div>
-    <div id="rcv-preview"></div>`;
+    <div id="rcv-preview"></div>
+    <div style="margin-top:16px;display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn btn-sm" onclick="exportarLibroExcel('compras')">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        Exportar libro compras
+      </button>
+      <button class="btn btn-sm" onclick="exportarLibroExcel('ventas')">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        Exportar libro ventas
+      </button>
+    </div>`;
+}
+
+let ventaMode = 'detalle'; // 'detalle' o 'resumen'
+
+function setVentaMode(mode) {
+  ventaMode = mode;
+  const btnDet = document.getElementById('btn-venta-detalle');
+  const btnRes = document.getElementById('btn-venta-resumen');
+  const txt = document.getElementById('venta-upload-text');
+  const sub = document.getElementById('venta-upload-sub');
+  if (mode === 'detalle') {
+    btnDet.style.cssText = 'flex:1;justify-content:center;background:var(--accent);border-color:var(--accent);color:#fff';
+    btnRes.style.cssText = 'flex:1;justify-content:center';
+    txt.textContent = 'Arrastrar RCV_VENTA_REGISTRO_*.csv';
+    sub.textContent = 'Detalle por factura/boleta emitida';
+  } else {
+    btnRes.style.cssText = 'flex:1;justify-content:center;background:var(--accent);border-color:var(--accent);color:#fff';
+    btnDet.style.cssText = 'flex:1;justify-content:center';
+    txt.textContent = 'Arrastrar RCV_RESUMEN_VENTA_*.csv';
+    sub.textContent = 'Resumen mensual (ventas con voucher/POS)';
+  }
+}
+
+function handleDropVentas(e) {
+  e.preventDefault();
+  document.getElementById('drop-ventas').classList.remove('drag');
+  const file = e.dataTransfer.files[0];
+  if (file) detectarYProcesarVentas(file);
+}
+
+async function detectarYProcesarVentas(file) {
+  if (!file) return;
+  if (ventaMode === 'resumen') {
+    await processRCVResumen(file);
+  } else {
+    await processRCV(file, 'venta');
+  }
+}
+
+async function processRCVResumen(file) {
+  if (!file) return;
+  const statusEl = document.getElementById('rcv-status');
+  const previewEl = document.getElementById('rcv-preview');
+  statusEl.innerHTML = `<div class="loading"><div class="spinner"></div> Procesando resumen de ventas...</div>`;
+
+  const text = await file.text();
+  const lines = text.split('\n').filter(l => l.trim());
+  const sep = lines[0].includes(';') ? ';' : ',';
+  const headers = lines[0].split(sep).map(h => h.replace(/"/g,'').trim());
+  const get = (row, name) => {
+    const idx = headers.findIndex(h => h.toLowerCase().includes(name.toLowerCase()));
+    return idx >= 0 ? (row[idx]||'').replace(/"/g,'').trim() : '';
+  };
+
+  // Detectar mes/año desde nombre del archivo (RCV_RESUMEN_VENTA_RUT_AAAAMM.csv)
+  let anioDetectado = state.anio, mesDetectado = state.mes;
+  const matchFecha = file.name.match(/(\d{4})(\d{2})\./);
+  if (matchFecha) {
+    anioDetectado = parseInt(matchFecha[1]);
+    mesDetectado = parseInt(matchFecha[2]);
+  }
+
+  let totalNeto = 0, totalIVA = 0, totalTotal = 0, totalDocs = 0;
+  const tipos = [];
+
+  for (let i = 1; i < lines.length; i++) {
+    const row = lines[i].split(sep);
+    if (row.length < 4) continue;
+    const tipoDoc = get(row, 'Tipo Documento');
+    const ndocs = parseInt(get(row, 'Total Documentos')) || 0;
+    const neto = parseFloat(get(row, 'Monto Neto')) || 0;
+    const iva = parseFloat(get(row, 'Monto IVA')) || 0;
+    const total = parseFloat(get(row, 'Monto Total')) || 0;
+    const exento = parseFloat(get(row, 'Monto Exento')) || 0;
+    if (!tipoDoc) continue;
+    totalNeto += neto; totalIVA += iva; totalTotal += total; totalDocs += ndocs;
+    tipos.push({ tipoDoc, ndocs, neto, iva, total, exento });
+  }
+
+  if (tipos.length === 0) {
+    statusEl.innerHTML = `<div class="alert alert-error">No se encontraron datos en el archivo.</div>`;
+    return;
+  }
+
+  // Guardar como un documento resumen de venta en rcv_documentos
+  const periodoId = await getOrCreatePeriodoFromDate(anioDetectado, mesDetectado);
+  const meses = ['','Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  const periodoLabel = `${meses[mesDetectado]} ${anioDetectado}`;
+
+  // Actualizar selector
+  document.getElementById('month-select').value = mesDetectado;
+  document.getElementById('year-select').value = anioDetectado;
+  state.mes = mesDetectado; state.anio = anioDetectado;
+
+  // Borrar ventas anteriores del período
+  await sb.from('rcv_documentos').delete().eq('empresa_id', state.empresaId).eq('periodo_id', periodoId).eq('tipo_mov', 'venta');
+
+  // Insertar una línea por cada tipo de documento del resumen
+  const insertData = tipos.map(t => ({
+    empresa_id: state.empresaId, periodo_id: periodoId,
+    tipo_mov: 'venta', tipo_doc: 0,
+    rut_contraparte: 'RESUMEN', razon_contraparte: t.tipoDoc,
+    folio: `${t.ndocs} docs`, fecha_docto: `${anioDetectado}-${String(mesDetectado).padStart(2,'0')}-28`,
+    monto_exento: t.exento, monto_neto: t.neto, iva: t.iva, monto_total: t.total
+  }));
+
+  const { error } = await sb.from('rcv_documentos').insert(insertData);
+  if (error) { statusEl.innerHTML = `<div class="alert alert-error">Error: ${error.message}</div>`; return; }
+
+  await generarAsientosRCV(tipos.map(t => ({ monto_neto: t.neto, iva: t.iva, monto_total: t.total })), periodoId, 'venta');
+
+  statusEl.innerHTML = `<div class="alert alert-success">✓ Resumen de ventas importado — <strong>${periodoLabel}</strong> — ${totalDocs} documentos</div>`;
+  previewEl.innerHTML = `
+    <div class="card">
+      <div class="card-header"><span class="card-title">Resumen ventas — ${periodoLabel}</span><span class="badge badge-green">${tipos.length} tipos</span></div>
+      <div class="card-body">
+        <div class="grid3 mb16">
+          <div class="metric"><div class="metric-label">Neto total</div><div class="metric-value green">${clp(totalNeto)}</div></div>
+          <div class="metric"><div class="metric-label">IVA débito</div><div class="metric-value">${clp(totalIVA)}</div></div>
+          <div class="metric"><div class="metric-label">Total</div><div class="metric-value">${clp(totalTotal)}</div></div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Tipo documento</th><th class="td-num">N° docs</th><th class="td-num">Neto</th><th class="td-num">IVA</th><th class="td-num">Total</th></tr></thead>
+            <tbody>
+              ${tipos.map(t=>`<tr>
+                <td>${t.tipoDoc}</td>
+                <td class="td-num">${t.ndocs}</td>
+                <td class="td-num">${clp(t.neto)}</td>
+                <td class="td-num td-muted">${clp(t.iva)}</td>
+                <td class="td-num">${clp(t.total)}</td>
+              </tr>`).join('')}
+              <tr style="background:var(--bg);font-weight:600">
+                <td>Total</td><td class="td-num">${totalDocs}</td>
+                <td class="td-num">${clp(totalNeto)}</td>
+                <td class="td-num">${clp(totalIVA)}</td>
+                <td class="td-num">${clp(totalTotal)}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>`;
 }
 
 function handleDrop(e, tipo) {
@@ -1343,7 +1539,11 @@ async function renderLibroDiario() {
   const { data: asientos } = await sb.from('asientos').select('*, asiento_lineas(*, cuentas(codigo, nombre))').eq('empresa_id', state.empresaId).eq('periodo_id', periodoId).order('fecha');
   if (!asientos?.length) { el.innerHTML = `<div class="alert alert-info">No hay asientos para ${getPeriodoLabel()}.</div>`; return; }
   const origenBadge = { rcv:'badge-blue', honorarios:'badge-amber', banco:'badge-gray', manual:'badge-green' };
-  let html = `<div class="flex-between mb16"><div style="font-size:13px;color:var(--text2)"><strong>${asientos.length}</strong> asientos — ${getPeriodoLabel()}</div></div>`;
+  let html = `<div class="flex-between mb16"><div style="font-size:13px;color:var(--text2)"><strong>${asientos.length}</strong> asientos — ${getPeriodoLabel()}</div>
+  <button class="btn btn-sm" onclick="exportarLibroExcel('diario')">
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+    Exportar CSV
+  </button></div>`;
   asientos.forEach(a => {
     const lineas = a.asiento_lineas || [];
     const totalDebe = lineas.reduce((s, l) => s + (l.debe || 0), 0);
@@ -1417,71 +1617,6 @@ async function renderLibroMayor() {
 }
 
 // ─── F29 ──────────────────────────────────────────────────────────
-async function renderF29() {
-  const el = document.getElementById('page-f29');
-  if (!requireEmpresa(el)) return;
-  el.innerHTML = `<div class="loading"><div class="spinner"></div> Calculando F29...</div>`;
-  const periodoId = await getPeriodoIdSilent();
-  let ivaDebito = 0, ivaCredito = 0, ventasNetas = 0, retenciones = 0;
-  if (periodoId) {
-    const { data: ventas } = await sb.from('rcv_documentos').select('monto_neto, iva').eq('empresa_id', state.empresaId).eq('periodo_id', periodoId).eq('tipo_mov', 'venta');
-    const { data: compras } = await sb.from('rcv_documentos').select('monto_neto, iva').eq('empresa_id', state.empresaId).eq('periodo_id', periodoId).eq('tipo_mov', 'compra');
-    const { data: hons } = await sb.from('honorarios').select('retencion').eq('empresa_id', state.empresaId).eq('periodo_id', periodoId);
-    ventasNetas = (ventas||[]).reduce((s,r) => s + (r.monto_neto||0), 0);
-    ivaDebito = (ventas||[]).reduce((s,r) => s + (r.iva||0), 0);
-    ivaCredito = (compras||[]).reduce((s,r) => s + (r.iva||0), 0);
-    retenciones = (hons||[]).reduce((s,r) => s + (r.retencion||0), 0);
-  }
-  const emp = state.empresas.find(e => e.id === state.empresaId);
-  const tasaPPM = emp?.tasa_ppm || 0.25;
-  const ppm = Math.round(ventasNetas * tasaPPM / 100);
-  const ivaAPagar = Math.max(0, ivaDebito - ivaCredito);
-  const remanente = ivaCredito > ivaDebito ? ivaCredito - ivaDebito : 0;
-  const totalF29 = ivaAPagar + ppm - retenciones;
-
-  el.innerHTML = `
-    <div class="grid2" style="gap:20px">
-      <div>
-        <div class="card mb16">
-          <div class="card-header"><span class="card-title">IVA</span></div>
-          <div class="card-body">
-            <div class="f29-row"><span class="f29-label">Ventas netas del período</span><span class="f29-value">${clp(ventasNetas)}</span></div>
-            <div class="f29-row"><span class="f29-label">IVA Débito Fiscal (ventas × 19%)</span><span class="f29-value" style="color:var(--red)">${clp(ivaDebito)}</span></div>
-            <div class="f29-row"><span class="f29-label">IVA Crédito Fiscal (compras)</span><span class="f29-value" style="color:var(--green)">− ${clp(ivaCredito)}</span></div>
-            <div class="f29-row"><span class="f29-label" style="font-weight:600">IVA a pagar</span><span class="f29-value">${clp(ivaAPagar)}</span></div>
-            ${remanente > 0 ? `<div class="alert alert-info" style="margin-top:8px;margin-bottom:0">Remanente IVA CF: ${clp(remanente)}</div>` : ''}
-          </div>
-        </div>
-        <div class="card">
-          <div class="card-header"><span class="card-title">PPM y Retenciones</span></div>
-          <div class="card-body">
-            <div class="f29-row"><span class="f29-label">Ventas netas</span><span class="f29-value">${clp(ventasNetas)}</span></div>
-            <div class="f29-row"><span class="f29-label">Tasa PPM (${tasaPPM}%)</span><span class="f29-value">${clp(ppm)}</span></div>
-            <div class="f29-row"><span class="f29-label">Retenciones honorarios</span><span class="f29-value" style="color:var(--green)">− ${clp(retenciones)}</span></div>
-          </div>
-        </div>
-      </div>
-      <div>
-        <div class="card">
-          <div class="card-header"><span class="card-title">Total a declarar en F29</span></div>
-          <div class="card-body">
-            <div class="f29-row"><span class="f29-label">IVA a pagar</span><span class="f29-value">${clp(ivaAPagar)}</span></div>
-            <div class="f29-row"><span class="f29-label">PPM</span><span class="f29-value">${clp(ppm)}</span></div>
-            <div class="f29-row"><span class="f29-label">Retenciones 2da categoría</span><span class="f29-value" style="color:var(--green)">− ${clp(retenciones)}</span></div>
-            <div class="f29-total">
-              <span class="f29-total-label">Total F29</span>
-              <span class="f29-total-value" style="color:${totalF29 >= 0 ? 'var(--red)' : 'var(--green)'}">${clp(Math.abs(totalF29))}</span>
-            </div>
-            ${totalF29 < 0 ? `<div class="alert alert-success" style="margin-top:12px">Saldo a favor: ${clp(Math.abs(totalF29))}</div>` : ''}
-            <div style="margin-top:16px;font-size:12px;color:var(--text3)">
-              Período: <strong>${getPeriodoLabel()}</strong> — ${state.empresaNombre}<br>
-              Generado: ${new Date().toLocaleDateString('es-CL')}
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>`;
-}
 
 // ─── BALANCE 8 COLUMNAS ───────────────────────────────────────────
 async function renderBalance() {
@@ -1921,8 +2056,708 @@ function updateThinkingMsg(text) {
   }
 }
 
+// ─── REPORTE CLIENTE ──────────────────────────────────────────────
+async function renderReporte() {
+  const el = document.getElementById('page-reporte');
+  if (!requireEmpresa(el)) return;
+  el.innerHTML = `<div class="loading"><div class="spinner"></div> Preparando reporte...</div>`;
+
+  const periodoId = await getPeriodoIdSilent();
+  const meses = ['','Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  const mesLabel = `${meses[state.mes]} ${state.anio}`;
+  const emp = state.empresas.find(e => e.id === state.empresaId);
+
+  let ventas = [], compras = [], hons = [];
+  if (periodoId) {
+    const r1 = await sb.from('rcv_documentos').select('*').eq('empresa_id', state.empresaId).eq('periodo_id', periodoId).eq('tipo_mov', 'venta');
+    const r2 = await sb.from('rcv_documentos').select('*').eq('empresa_id', state.empresaId).eq('periodo_id', periodoId).eq('tipo_mov', 'compra');
+    const r3 = await sb.from('honorarios').select('*').eq('empresa_id', state.empresaId).eq('periodo_id', periodoId);
+    ventas = r1.data || []; compras = r2.data || []; hons = r3.data || [];
+  }
+
+  const totalVentasNeto = ventas.reduce((s,r) => s + r.monto_neto, 0);
+  const totalVentasTotal = ventas.reduce((s,r) => s + r.monto_total, 0);
+  const totalComprasNeto = compras.reduce((s,r) => s + r.monto_neto, 0);
+  const totalComprasTotal = compras.reduce((s,r) => s + r.monto_total, 0);
+  const ivaDebito = ventas.reduce((s,r) => s + r.iva, 0);
+  const ivaCredito = compras.reduce((s,r) => s + r.iva, 0);
+  const totalHon = hons.reduce((s,h) => s + h.monto_bruto, 0);
+  const totalRet = hons.reduce((s,h) => s + h.retencion, 0);
+  const resultado = totalVentasNeto - totalComprasNeto - totalHon;
+  const remanteAnteriorRep = await calcularRemanteAcumulado(state.anio, state.mes);
+  const creditoTotal = ivaCredito + remanteAnteriorRep;
+  const ivaPagar = Math.max(0, ivaDebito - creditoTotal);
+  const remanente = creditoTotal > ivaDebito ? creditoTotal - ivaDebito : 0;
+  const ppm = Math.round(totalVentasNeto * (emp?.tasa_ppm || 0.25) / 100);
+  const totalF29 = ivaPagar + ppm - totalRet;
+  const margen = totalVentasNeto > 0 ? ((resultado / totalVentasNeto) * 100).toFixed(1) : 0;
+
+  // Bar chart widths
+  const maxVal = Math.max(totalVentasNeto, totalComprasNeto, totalHon, 1);
+  const barV = Math.round((totalVentasNeto / maxVal) * 100);
+  const barC = Math.round((totalComprasNeto / maxVal) * 100);
+  const barH = Math.round((totalHon / maxVal) * 100);
+
+  el.innerHTML = `
+    <div class="flex-between mb16">
+      <div style="font-size:13px;color:var(--text2)">Vista previa del reporte — ${mesLabel}</div>
+      <div class="flex gap8">
+        <button class="btn" onclick="window.print()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+          Imprimir / PDF
+        </button>
+      </div>
+    </div>
+
+    <div id="reporte-print" style="background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08);max-width:800px">
+
+      <!-- PORTADA -->
+      <div style="background:linear-gradient(135deg,#1e40af,#3b82f6);padding:40px 36px;color:#fff">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px">
+          <div>
+            <div style="font-size:11px;letter-spacing:.12em;text-transform:uppercase;opacity:.7;margin-bottom:6px">Informe Contable Mensual</div>
+            <div style="font-size:28px;font-weight:700;margin-bottom:4px">${state.empresaNombre}</div>
+            <div style="font-size:15px;opacity:.85">Período: ${mesLabel}</div>
+            <div style="font-size:12px;opacity:.6;margin-top:4px">RUT: ${emp?.rut || ''} · Régimen: ${emp?.regimen || ''}</div>
+          </div>
+          ${emp?.logo_url ? `<img src="${emp.logo_url}" style="height:60px;border-radius:8px;object-fit:contain;background:rgba(255,255,255,0.15);padding:6px" onerror="this.style.display='none'">` : ''}
+        </div>
+        <div style="margin-top:20px;display:flex;gap:20px">
+          <div style="background:rgba(255,255,255,0.15);border-radius:10px;padding:14px 20px;flex:1">
+            <div style="font-size:11px;opacity:.7;margin-bottom:4px">INGRESOS DEL MES</div>
+            <div style="font-size:22px;font-weight:700">${clp(totalVentasNeto)}</div>
+          </div>
+          <div style="background:rgba(255,255,255,0.15);border-radius:10px;padding:14px 20px;flex:1">
+            <div style="font-size:11px;opacity:.7;margin-bottom:4px">EGRESOS DEL MES</div>
+            <div style="font-size:22px;font-weight:700">${clp(totalComprasNeto + totalHon)}</div>
+          </div>
+          <div style="background:rgba(255,255,255,${resultado >= 0 ? '0.2' : '0.1'});border-radius:10px;padding:14px 20px;flex:1;border:1px solid rgba(255,255,255,0.3)">
+            <div style="font-size:11px;opacity:.7;margin-bottom:4px">RESULTADO</div>
+            <div style="font-size:22px;font-weight:700">${clp(resultado)}</div>
+          </div>
+        </div>
+      </div>
+
+      <div style="padding:32px 36px">
+
+        <!-- GRÁFICO BARRAS -->
+        <div style="margin-bottom:28px">
+          <div style="font-size:14px;font-weight:600;margin-bottom:16px;color:#1e293b">📊 Resumen visual del mes</div>
+          <div style="display:flex;flex-direction:column;gap:12px">
+            <div>
+              <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px"><span style="color:#64748b">Ingresos (ventas netas)</span><span style="font-weight:600;color:#16a34a">${clp(totalVentasNeto)}</span></div>
+              <div style="background:#f1f5f9;border-radius:6px;height:24px;overflow:hidden"><div style="width:${barV}%;background:linear-gradient(90deg,#16a34a,#22c55e);height:100%;border-radius:6px;transition:width .5s"></div></div>
+            </div>
+            <div>
+              <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px"><span style="color:#64748b">Compras</span><span style="font-weight:600;color:#2563eb">${clp(totalComprasNeto)}</span></div>
+              <div style="background:#f1f5f9;border-radius:6px;height:24px;overflow:hidden"><div style="width:${barC}%;background:linear-gradient(90deg,#2563eb,#60a5fa);height:100%;border-radius:6px"></div></div>
+            </div>
+            ${totalHon > 0 ? `<div>
+              <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px"><span style="color:#64748b">Honorarios</span><span style="font-weight:600;color:#d97706">${clp(totalHon)}</span></div>
+              <div style="background:#f1f5f9;border-radius:6px;height:24px;overflow:hidden"><div style="width:${barH}%;background:linear-gradient(90deg,#d97706,#fbbf24);height:100%;border-radius:6px"></div></div>
+            </div>` : ''}
+          </div>
+        </div>
+
+        <!-- GRÁFICO TORTA GASTOS -->
+        ${(totalComprasNeto + totalHon) > 0 ? `<div style="margin-bottom:28px">
+          <div style="font-size:14px;font-weight:600;margin-bottom:4px;color:#1e293b">🥧 Distribución de gastos</div>
+          <div style="font-size:12px;color:#94a3b8;margin-bottom:16px">Composición del total de egresos del mes</div>
+          <div style="display:flex;align-items:center;gap:32px">
+            <canvas id="pieChart" width="180" height="180" style="flex-shrink:0"></canvas>
+            <div id="pieLegend" style="flex:1;display:flex;flex-direction:column;gap:10px"></div>
+          </div>
+        </div>` : ''}
+
+        <!-- ESTADO DE RESULTADOS -->
+        <div style="margin-bottom:28px">
+          <div style="font-size:14px;font-weight:600;margin-bottom:12px;color:#1e293b">📈 Estado de resultados</div>
+          <div style="border:1px solid #e2e8f0;border-radius:10px;overflow:hidden">
+            <div style="display:flex;justify-content:space-between;padding:10px 16px;border-bottom:1px solid #e2e8f0;font-size:13px"><span style="color:#475569">Ventas netas</span><span style="font-weight:500;color:#16a34a">${clp(totalVentasNeto)}</span></div>
+            <div style="display:flex;justify-content:space-between;padding:10px 16px;border-bottom:1px solid #e2e8f0;font-size:13px"><span style="color:#475569">Compras / Costo</span><span style="color:#dc2626">− ${clp(totalComprasNeto)}</span></div>
+            ${totalHon > 0 ? `<div style="display:flex;justify-content:space-between;padding:10px 16px;border-bottom:1px solid #e2e8f0;font-size:13px"><span style="color:#475569">Honorarios</span><span style="color:#dc2626">− ${clp(totalHon)}</span></div>` : ''}
+            <div style="display:flex;justify-content:space-between;padding:14px 16px;background:${resultado >= 0 ? '#f0fdf4' : '#fef2f2'};font-size:15px;font-weight:700">
+              <span>${resultado >= 0 ? '✅ Utilidad del mes' : '⚠️ Pérdida del mes'}</span>
+              <span style="color:${resultado >= 0 ? '#16a34a' : '#dc2626'}">${clp(Math.abs(resultado))}</span>
+            </div>
+          </div>
+          ${totalVentasNeto > 0 ? `<div style="text-align:right;font-size:12px;color:#94a3b8;margin-top:6px">Margen: ${margen}%</div>` : ''}
+        </div>
+
+        <!-- F29 -->
+        <div style="margin-bottom:28px">
+          <div style="font-size:14px;font-weight:600;margin-bottom:12px;color:#1e293b">🧾 Impuestos del mes (F29)</div>
+          <div style="border:1px solid #e2e8f0;border-radius:10px;overflow:hidden">
+            <div style="display:flex;justify-content:space-between;padding:10px 16px;border-bottom:1px solid #e2e8f0;font-size:13px"><span style="color:#475569">IVA débito fiscal (ventas)</span><span>${clp(ivaDebito)}</span></div>
+            <div style="display:flex;justify-content:space-between;padding:10px 16px;border-bottom:1px solid #e2e8f0;font-size:13px"><span style="color:#475569">IVA crédito fiscal (compras)</span><span style="color:#16a34a">− ${clp(ivaCredito)}</span></div>
+            ${remanteAnteriorRep > 0 ? `<div style="display:flex;justify-content:space-between;padding:10px 16px;border-bottom:1px solid #e2e8f0;font-size:13px;background:#eff6ff"><span style="color:#2563eb">Remanente IVA meses anteriores</span><span style="color:#2563eb">− ${clp(remanteAnteriorRep)}</span></div>` : ''}
+            <div style="display:flex;justify-content:space-between;padding:10px 16px;border-bottom:1px solid #e2e8f0;font-size:13px"><span style="color:#475569">PPM (${emp?.tasa_ppm || 0.25}%)</span><span>${clp(ppm)}</span></div>
+            ${totalRet > 0 ? `<div style="display:flex;justify-content:space-between;padding:10px 16px;border-bottom:1px solid #e2e8f0;font-size:13px"><span style="color:#475569">Retenciones honorarios</span><span style="color:#16a34a">− ${clp(totalRet)}</span></div>` : ''}
+            ${remanente > 0 ? `<div style="display:flex;justify-content:space-between;padding:10px 16px;border-bottom:1px solid #e2e8f0;font-size:13px;background:#eff6ff"><span style="color:#2563eb">Remanente que se arrastra</span><span style="color:#2563eb">${clp(remanente)}</span></div>` : ''}
+            <div style="display:flex;justify-content:space-between;padding:14px 16px;background:${totalF29 > 0 ? '#fef2f2' : '#f0fdf4'};font-size:15px;font-weight:700">
+              <span>${totalF29 > 0 ? '💳 Total a pagar F29' : '✅ Saldo a favor'}</span>
+              <span style="color:${totalF29 > 0 ? '#dc2626' : '#16a34a'}">${clp(Math.abs(totalF29))}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- DETALLE IVA CRÉDITO -->
+        ${compras.length > 0 ? `<div style="margin-bottom:28px">
+          <div style="font-size:14px;font-weight:600;margin-bottom:4px;color:#1e293b">🧾 Detalle IVA crédito fiscal</div>
+          <div style="font-size:12px;color:#94a3b8;margin-bottom:12px">Facturas de compra que generan crédito fiscal del mes</div>
+          <div style="border:1px solid #e2e8f0;border-radius:10px;overflow:hidden">
+            <table style="width:100%;border-collapse:collapse;font-size:12px">
+              <thead><tr style="background:#f8fafc">
+                <th style="padding:8px 12px;text-align:left;color:#64748b;font-weight:500">Fecha</th>
+                <th style="padding:8px 12px;text-align:left;color:#64748b;font-weight:500">Proveedor</th>
+                <th style="padding:8px 12px;text-align:left;color:#64748b;font-weight:500">RUT</th>
+                <th style="padding:8px 12px;text-align:right;color:#64748b;font-weight:500">Neto</th>
+                <th style="padding:8px 12px;text-align:right;color:#64748b;font-weight:500">IVA crédito</th>
+                <th style="padding:8px 12px;text-align:right;color:#64748b;font-weight:500">Total</th>
+              </tr></thead>
+              <tbody>
+                ${compras.sort((a,b) => (a.fecha_docto||'').localeCompare(b.fecha_docto||'')).map(r => `
+                <tr style="border-top:1px solid #f1f5f9">
+                  <td style="padding:8px 12px;color:#94a3b8">${r.fecha_docto||'—'}</td>
+                  <td style="padding:8px 12px;color:#334155;font-weight:500">${r.razon_contraparte||'—'}</td>
+                  <td style="padding:8px 12px;color:#94a3b8">${r.rut_contraparte||'—'}</td>
+                  <td style="padding:8px 12px;text-align:right;color:#334155">${clp(r.monto_neto)}</td>
+                  <td style="padding:8px 12px;text-align:right;color:#16a34a;font-weight:500">${clp(r.iva)}</td>
+                  <td style="padding:8px 12px;text-align:right;color:#334155">${clp(r.monto_total)}</td>
+                </tr>`).join('')}
+              </tbody>
+              <tfoot>
+                <tr style="background:#f0fdf4;border-top:2px solid #bbf7d0">
+                  <td colspan="3" style="padding:10px 12px;font-weight:700;color:#15803d">Total IVA crédito fiscal</td>
+                  <td style="padding:10px 12px;text-align:right;font-weight:600">${clp(totalComprasNeto)}</td>
+                  <td style="padding:10px 12px;text-align:right;font-weight:700;color:#15803d">${clp(ivaCredito)}</td>
+                  <td style="padding:10px 12px;text-align:right;font-weight:600">${clp(totalComprasTotal)}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>` : ''}
+
+        <!-- PIE -->
+        <div style="border-top:1px solid #e2e8f0;padding-top:16px;display:flex;justify-content:space-between;align-items:center">
+          <div style="font-size:11px;color:#94a3b8">Generado por ContaPyme · ${new Date().toLocaleDateString('es-CL')} · Período ${mesLabel}</div>
+          <div style="font-size:11px;color:#94a3b8">${state.empresaNombre} · RUT ${emp?.rut || ''}</div>
+        </div>
+
+      </div>
+    </div>`;
+
+  // Draw pie chart after DOM renders
+  if ((totalComprasNeto + totalHon) > 0) {
+    setTimeout(() => drawPieChart(compras, totalHon), 150);
+  }
+}
+
+function drawPieChart(compras, totalHon) {
+  const canvas = document.getElementById('pieChart');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const cx = 90, cy = 90, r = 80;
+
+  // Group by proveedor, top 4 + otros
+  const grouped = {};
+  compras.forEach(c => {
+    const key = (c.razon_contraparte || 'Otros').substring(0, 25);
+    grouped[key] = (grouped[key] || 0) + (c.monto_neto || 0);
+  });
+  if (totalHon > 0) grouped['Honorarios'] = totalHon;
+
+  let entries = Object.entries(grouped).sort((a,b) => b[1]-a[1]);
+  if (entries.length > 5) {
+    const others = entries.slice(4).reduce((s,e) => s + e[1], 0);
+    entries = entries.slice(0,4);
+    if (others > 0) entries.push(['Otros gastos', others]);
+  }
+
+  const total = entries.reduce((s,e) => s + e[1], 0);
+  if (total === 0) return;
+  const colors = ['#2563eb','#d97706','#dc2626','#7c3aed','#0891b2','#64748b'];
+
+  let angle = -Math.PI / 2;
+  entries.forEach(([label, val], i) => {
+    const slice = (val / total) * 2 * Math.PI;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.arc(cx, cy, r, angle, angle + slice);
+    ctx.closePath();
+    ctx.fillStyle = colors[i % colors.length];
+    ctx.fill();
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    angle += slice;
+  });
+
+  // Donut hole
+  ctx.beginPath();
+  ctx.arc(cx, cy, 40, 0, 2 * Math.PI);
+  ctx.fillStyle = '#fff';
+  ctx.fill();
+  ctx.fillStyle = '#1e293b';
+  ctx.font = 'bold 11px -apple-system,sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('Gastos', cx, cy - 3);
+  ctx.font = '10px -apple-system,sans-serif';
+  ctx.fillStyle = '#94a3b8';
+  ctx.fillText('del mes', cx, cy + 11);
+
+  // Legend
+  const legend = document.getElementById('pieLegend');
+  if (!legend) return;
+  legend.innerHTML = entries.map(([label, val], i) => `
+    <div style="display:flex;align-items:center;gap:8px">
+      <div style="width:10px;height:10px;border-radius:2px;background:${colors[i%colors.length]};flex-shrink:0"></div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:12px;color:#334155;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${label}</div>
+        <div style="font-size:11px;color:#94a3b8">${clp(val)} · ${((val/total)*100).toFixed(1)}%</div>
+      </div>
+    </div>`).join('');
+}
+
+// ─── REMANENTE IVA ACUMULADO ──────────────────────────────────────
+async function calcularRemanteAcumulado(hastaAnio, hastaMes) {
+  // Obtener todos los períodos anteriores ordenados
+  const { data: periodos } = await sb.from('periodos')
+    .select('id, anio, mes')
+    .eq('empresa_id', state.empresaId)
+    .order('anio').order('mes');
+  
+  let remanente = 0;
+  for (const p of (periodos || [])) {
+    if (p.anio > hastaAnio || (p.anio === hastaAnio && p.mes >= hastaMes)) break;
+    const { data: v } = await sb.from('rcv_documentos').select('iva').eq('periodo_id', p.id).eq('tipo_mov', 'venta');
+    const { data: c } = await sb.from('rcv_documentos').select('iva').eq('periodo_id', p.id).eq('tipo_mov', 'compra');
+    const deb = (v||[]).reduce((s,r) => s + r.iva, 0);
+    const cred = (c||[]).reduce((s,r) => s + r.iva, 0);
+    const saldo = deb - cred - remanente;
+    if (saldo < 0) remanente = Math.abs(saldo);
+    else remanente = 0;
+  }
+  return remanente;
+}
+
+// ─── F29 MEJORADO CON REMANENTE ──────────────────────────────────
+// (actualizar renderF29 para incluir remanente acumulado)
+async function renderF29() {
+  const el = document.getElementById('page-f29');
+  if (!requireEmpresa(el)) return;
+  el.innerHTML = `<div class="loading"><div class="spinner"></div> Calculando F29...</div>`;
+  
+  const periodoId = await getPeriodoIdSilent();
+  let ivaDebito = 0, ivaCredito = 0, ventasNetas = 0, retenciones = 0;
+  if (periodoId) {
+    const { data: ventas } = await sb.from('rcv_documentos').select('monto_neto, iva').eq('empresa_id', state.empresaId).eq('periodo_id', periodoId).eq('tipo_mov', 'venta');
+    const { data: compras } = await sb.from('rcv_documentos').select('monto_neto, iva').eq('empresa_id', state.empresaId).eq('periodo_id', periodoId).eq('tipo_mov', 'compra');
+    const { data: hons } = await sb.from('honorarios').select('retencion').eq('empresa_id', state.empresaId).eq('periodo_id', periodoId);
+    ventasNetas = (ventas||[]).reduce((s,r) => s + (r.monto_neto||0), 0);
+    ivaDebito = (ventas||[]).reduce((s,r) => s + (r.iva||0), 0);
+    ivaCredito = (compras||[]).reduce((s,r) => s + (r.iva||0), 0);
+    retenciones = (hons||[]).reduce((s,r) => s + (r.retencion||0), 0);
+  }
+
+  // Remanente acumulado de meses anteriores
+  const remanteAnterior = await calcularRemanteAcumulado(state.anio, state.mes);
+  
+  const emp = state.empresas.find(e => e.id === state.empresaId);
+  const tasaPPM = emp?.tasa_ppm || 0.25;
+  const ppm = Math.round(ventasNetas * tasaPPM / 100);
+  const creditoTotal = ivaCredito + remanteAnterior;
+  const ivaAPagar = Math.max(0, ivaDebito - creditoTotal);
+  const remanenteNuevo = creditoTotal > ivaDebito ? creditoTotal - ivaDebito : 0;
+  const totalF29 = ivaAPagar + ppm - retenciones;
+  const meses = ['','Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+
+  el.innerHTML = `
+    <div class="grid2" style="gap:20px">
+      <div>
+        <div class="card mb16">
+          <div class="card-header"><span class="card-title">IVA — ${meses[state.mes]} ${state.anio}</span></div>
+          <div class="card-body">
+            <div class="f29-row"><span class="f29-label">Ventas netas del período</span><span class="f29-value">${clp(ventasNetas)}</span></div>
+            <div class="f29-row"><span class="f29-label">IVA Débito Fiscal (ventas × 19%)</span><span class="f29-value" style="color:var(--red)">${clp(ivaDebito)}</span></div>
+            <div class="f29-row"><span class="f29-label">IVA Crédito Fiscal (compras)</span><span class="f29-value" style="color:var(--green)">− ${clp(ivaCredito)}</span></div>
+            ${remanteAnterior > 0 ? `<div class="f29-row" style="background:var(--accent-bg);margin:4px -4px;padding:8px 4px;border-radius:6px"><span class="f29-label" style="color:var(--accent)">Remanente IVA meses anteriores</span><span class="f29-value" style="color:var(--accent)">− ${clp(remanteAnterior)}</span></div>` : ''}
+            <div class="f29-row" style="border-top:2px solid var(--border);margin-top:4px"><span class="f29-label" style="font-weight:600">IVA a pagar</span><span class="f29-value">${clp(ivaAPagar)}</span></div>
+            ${remanenteNuevo > 0 ? `<div class="alert alert-info" style="margin-top:8px;margin-bottom:0">Remanente que se arrastra al próximo mes: <strong>${clp(remanenteNuevo)}</strong></div>` : ''}
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header"><span class="card-title">PPM y Retenciones</span></div>
+          <div class="card-body">
+            <div class="f29-row"><span class="f29-label">Ventas netas</span><span class="f29-value">${clp(ventasNetas)}</span></div>
+            <div class="f29-row"><span class="f29-label">Tasa PPM (${tasaPPM}%)</span><span class="f29-value">${clp(ppm)}</span></div>
+            <div class="f29-row"><span class="f29-label">Retenciones honorarios</span><span class="f29-value" style="color:var(--green)">− ${clp(retenciones)}</span></div>
+          </div>
+        </div>
+      </div>
+      <div>
+        <div class="card">
+          <div class="card-header"><span class="card-title">Total a declarar en F29</span></div>
+          <div class="card-body">
+            <div class="f29-row"><span class="f29-label">IVA a pagar</span><span class="f29-value">${clp(ivaAPagar)}</span></div>
+            <div class="f29-row"><span class="f29-label">PPM</span><span class="f29-value">${clp(ppm)}</span></div>
+            <div class="f29-row"><span class="f29-label">Retenciones 2da categoría</span><span class="f29-value" style="color:var(--green)">− ${clp(retenciones)}</span></div>
+            <div class="f29-total">
+              <span class="f29-total-label">Total F29</span>
+              <span class="f29-total-value" style="color:${totalF29 >= 0 ? 'var(--red)' : 'var(--green)'}">${clp(Math.abs(totalF29))}</span>
+            </div>
+            ${totalF29 < 0 ? `<div class="alert alert-success" style="margin-top:12px">Saldo a favor: ${clp(Math.abs(totalF29))}</div>` : ''}
+            <div style="margin-top:16px;font-size:12px;color:var(--text3)">
+              Período: <strong>${meses[state.mes]} ${state.anio}</strong> — ${state.empresaNombre}<br>
+              Vencimiento: <strong>día 20 del mes siguiente</strong><br>
+              Generado: ${new Date().toLocaleDateString('es-CL')}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>`;
+}
+
+// ─── PERÍODOS / CIERRE ────────────────────────────────────────────
+async function renderPeriodos() {
+  const el = document.getElementById('page-periodos');
+  if (!requireEmpresa(el)) return;
+  el.innerHTML = `<div class="loading"><div class="spinner"></div> Cargando períodos...</div>`;
+
+  const { data: periodos } = await sb.from('periodos').select('*').eq('empresa_id', state.empresaId).order('anio', { ascending: false }).order('mes', { ascending: false });
+  const meses = ['','Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+
+  if (!periodos?.length) { el.innerHTML = `<div class="alert alert-info">No hay períodos registrados aún.</div>`; return; }
+
+  const rows = periodos.map(p => `
+    <tr>
+      <td><strong>${meses[p.mes]} ${p.anio}</strong></td>
+      <td><span class="badge ${p.cerrado ? 'badge-red' : 'badge-green'}">${p.cerrado ? 'Cerrado' : 'Abierto'}</span></td>
+      <td>
+        ${p.cerrado
+          ? `<button class="btn btn-sm" onclick="reabrirPeriodo('${p.id}','${meses[p.mes]} ${p.anio}')">Reabrir</button>`
+          : `<button class="btn btn-sm btn-danger" onclick="cerrarPeriodo('${p.id}','${meses[p.mes]} ${p.anio}')">Cerrar período</button>`
+        }
+      </td>
+    </tr>`).join('');
+
+  el.innerHTML = `
+    <div class="alert alert-info mb16">Al cerrar un período, los asientos quedan bloqueados y no se pueden modificar. Úsalo después de declarar el F29.</div>
+    <div class="card">
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Período</th><th>Estado</th><th>Acción</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+    </div>`;
+}
+
+async function cerrarPeriodo(id, label) {
+  if (!confirm(`¿Cerrar el período ${label}? Los asientos quedarán bloqueados.`)) return;
+  await sb.from('periodos').update({ cerrado: true }).eq('id', id);
+  showAlert(`Período ${label} cerrado correctamente`);
+  renderPeriodos();
+}
+
+async function reabrirPeriodo(id, label) {
+  if (!confirm(`¿Reabrir el período ${label}?`)) return;
+  await sb.from('periodos').update({ cerrado: false }).eq('id', id);
+  showAlert(`Período ${label} reabierto`);
+  renderPeriodos();
+}
+
+// ─── DEPRECIACIÓN ─────────────────────────────────────────────────
+async function renderDepreciacion() {
+  const el = document.getElementById('page-depreciacion');
+  if (!requireEmpresa(el)) return;
+  el.innerHTML = `<div class="loading"><div class="spinner"></div> Cargando activos...</div>`;
+
+  // Cargar activos desde localStorage por empresa
+  const key = `activos_${state.empresaId}`;
+  let activos = JSON.parse(localStorage.getItem(key) || '[]');
+
+  const totalDepMensual = activos.reduce((s,a) => s + (a.depMensual||0), 0);
+
+  el.innerHTML = `
+    <div class="flex-between mb16">
+      <div style="font-size:13px;color:var(--text2)">Depreciación mensual total: <strong>${clp(totalDepMensual)}</strong></div>
+      <div class="flex gap8">
+        <button class="btn btn-primary" onclick="newActivo()">+ Nuevo activo</button>
+        ${activos.length ? `<button class="btn" onclick="registrarDepreciacionMes()">Registrar depreciación ${getPeriodoLabel()}</button>` : ''}
+      </div>
+    </div>
+    <div class="card mb16">
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Activo</th><th>Valor original</th><th>Vida útil</th><th class="td-num">Dep. mensual</th><th class="td-num">Dep. acumulada</th><th></th></tr></thead>
+          <tbody>
+            ${activos.length ? activos.map((a,i) => `<tr>
+              <td><strong>${a.nombre}</strong><div class="td-muted">${a.tipo}</div></td>
+              <td>${clp(a.valor)}</td>
+              <td>${a.vidaUtil} años</td>
+              <td class="td-num">${clp(a.depMensual)}</td>
+              <td class="td-num" style="color:var(--red)">${clp(a.depAcumulada||0)}</td>
+              <td><button class="btn btn-sm btn-danger" onclick="deleteActivo(${i})">Eliminar</button></td>
+            </tr>`).join('') : `<tr><td colspan="6"><div class="empty"><div class="empty-title">Sin activos registrados</div><div class="empty-sub">Agrega maquinaria, equipos, vehículos, etc.</div></div></td></tr>`}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="alert alert-info">La depreciación se calcula en línea recta: Valor ÷ (Vida útil × 12). Al hacer clic en "Registrar depreciación" se crea el asiento contable del mes automáticamente.</div>`;
+}
+
+function newActivo() {
+  showModal('Nuevo activo fijo', `
+    <div class="form-group"><label class="form-label">Nombre del activo</label><input class="form-input" id="a-nombre" placeholder="Ej: Máquina de coser industrial"></div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">Tipo</label>
+        <select class="form-select" id="a-tipo">
+          <option>Maquinaria y equipo</option>
+          <option>Equipos computacionales</option>
+          <option>Vehículos</option>
+          <option>Muebles y útiles</option>
+          <option>Otros</option>
+        </select>
+      </div>
+      <div class="form-group"><label class="form-label">Vida útil (años)</label>
+        <select class="form-select" id="a-vida">
+          <option value="3">3 años (equipos computacionales)</option>
+          <option value="5">5 años (vehículos)</option>
+          <option value="7" selected>7 años (maquinaria)</option>
+          <option value="10">10 años (muebles)</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">Valor de compra ($)</label><input class="form-input" id="a-valor" type="number" placeholder="1500000" oninput="calcDepPreview()"></div>
+      <div class="form-group"><label class="form-label">Fecha de compra</label><input class="form-input" id="a-fecha" type="date" value="${state.anio}-${String(state.mes).padStart(2,'0')}-01"></div>
+    </div>
+    <div id="dep-preview" style="background:var(--surface-1);border-radius:8px;padding:10px;font-size:13px;color:var(--text-secondary);margin-top:4px">Ingresa el valor para ver la depreciación mensual</div>`,
+    async () => {
+      const nombre = document.getElementById('a-nombre').value.trim();
+      const tipo = document.getElementById('a-tipo').value;
+      const vida = parseInt(document.getElementById('a-vida').value);
+      const valor = parseFloat(document.getElementById('a-valor').value) || 0;
+      const fecha = document.getElementById('a-fecha').value;
+      if (!nombre || !valor) return showAlert('Completa nombre y valor', 'error');
+      const depMensual = Math.round(valor / (vida * 12));
+      const key = `activos_${state.empresaId}`;
+      const activos = JSON.parse(localStorage.getItem(key) || '[]');
+      activos.push({ nombre, tipo, valor, vidaUtil: vida, depMensual, fecha, depAcumulada: 0 });
+      localStorage.setItem(key, JSON.stringify(activos));
+      closeModal();
+      renderDepreciacion();
+      showAlert('Activo agregado correctamente');
+    });
+}
+
+function calcDepPreview() {
+  const valor = parseFloat(document.getElementById('a-valor')?.value) || 0;
+  const vida = parseInt(document.getElementById('a-vida')?.value) || 7;
+  const dep = Math.round(valor / (vida * 12));
+  const el = document.getElementById('dep-preview');
+  if (el) el.innerHTML = `Depreciación mensual: <strong>${clp(dep)}</strong> · Depreciación anual: <strong>${clp(dep*12)}</strong>`;
+}
+
+function deleteActivo(idx) {
+  if (!confirm('¿Eliminar este activo?')) return;
+  const key = `activos_${state.empresaId}`;
+  const activos = JSON.parse(localStorage.getItem(key) || '[]');
+  activos.splice(idx, 1);
+  localStorage.setItem(key, JSON.stringify(activos));
+  renderDepreciacion();
+}
+
+async function registrarDepreciacionMes() {
+  const key = `activos_${state.empresaId}`;
+  const activos = JSON.parse(localStorage.getItem(key) || '[]');
+  if (!activos.length) return;
+  const totalDep = activos.reduce((s,a) => s + a.depMensual, 0);
+  const getCuenta = (cod) => state.cuentas.find(c => c.codigo === cod)?.id;
+  const periodoId = await getOrCreatePeriodo();
+  const fecha = `${state.anio}-${String(state.mes).padStart(2,'0')}-28`;
+  const cDep = getCuenta('510106');
+  const cDepAcum = getCuenta('210097') || getCuenta('210098') || getCuenta('210099');
+  if (!cDep || !cDepAcum) return showAlert('Faltan cuentas de depreciación en el plan de cuentas. Importa el plan estándar primero.', 'error');
+  const { error } = await sb.from('asientos').insert({ empresa_id: state.empresaId, periodo_id: periodoId, fecha, glosa: `Depreciación activos fijos — ${getPeriodoLabel()}`, origen: 'manual' }).select('id').single().then(async ({ data, error }) => {
+    if (error || !data) return { error };
+    await sb.from('asiento_lineas').insert([
+      { asiento_id: data.id, cuenta_id: cDep, debe: totalDep, haber: 0, glosa: 'Depreciación del ejercicio' },
+      { asiento_id: data.id, cuenta_id: cDepAcum, debe: 0, haber: totalDep, glosa: 'Depreciación acumulada' }
+    ]);
+    // Actualizar depreciación acumulada en localStorage
+    activos.forEach(a => a.depAcumulada = (a.depAcumulada||0) + a.depMensual);
+    localStorage.setItem(key, JSON.stringify(activos));
+    return { error: null };
+  });
+  if (error) return showAlert('Error: ' + error.message, 'error');
+  showAlert(`Depreciación de ${clp(totalDep)} registrada correctamente`);
+  renderDepreciacion();
+}
+
+// ─── REPORTE ANUAL ────────────────────────────────────────────────
+async function renderReporteAnual() {
+  const el = document.getElementById('page-reporte-anual');
+  if (!requireEmpresa(el)) return;
+  el.innerHTML = `<div class="loading"><div class="spinner"></div> Generando reporte anual...</div>`;
+
+  const { data: periodos } = await sb.from('periodos').select('*').eq('empresa_id', state.empresaId).eq('anio', state.anio).order('mes');
+  const meses = ['','Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+  const mesesFull = ['','Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  const emp = state.empresas.find(e => e.id === state.empresaId);
+
+  if (!periodos?.length) { el.innerHTML = `<div class="alert alert-info">No hay datos para el año ${state.anio}.</div>`; return; }
+
+  const resumen = [];
+  let totalAnualVentas = 0, totalAnualCompras = 0, totalAnualHon = 0, totalAnualIvaDeb = 0, totalAnualIvaCred = 0, totalAnualPPM = 0;
+
+  for (const p of periodos) {
+    const { data: v } = await sb.from('rcv_documentos').select('monto_neto, iva').eq('periodo_id', p.id).eq('tipo_mov', 'venta');
+    const { data: c } = await sb.from('rcv_documentos').select('monto_neto, iva').eq('periodo_id', p.id).eq('tipo_mov', 'compra');
+    const { data: h } = await sb.from('honorarios').select('monto_bruto, retencion').eq('periodo_id', p.id);
+    const ventas = (v||[]).reduce((s,r) => s+r.monto_neto, 0);
+    const compras = (c||[]).reduce((s,r) => s+r.monto_neto, 0);
+    const hon = (h||[]).reduce((s,r) => s+r.monto_bruto, 0);
+    const ivaDeb = (v||[]).reduce((s,r) => s+r.iva, 0);
+    const ivaCred = (c||[]).reduce((s,r) => s+r.iva, 0);
+    const ppm = Math.round(ventas * (emp?.tasa_ppm||0.25) / 100);
+    const resultado = ventas - compras - hon;
+    totalAnualVentas += ventas; totalAnualCompras += compras; totalAnualHon += hon;
+    totalAnualIvaDeb += ivaDeb; totalAnualIvaCred += ivaCred; totalAnualPPM += ppm;
+    resumen.push({ mes: p.mes, ventas, compras, hon, ivaDeb, ivaCred, ppm, resultado });
+  }
+
+  const totalAnualResultado = totalAnualVentas - totalAnualCompras - totalAnualHon;
+  const margenAnual = totalAnualVentas > 0 ? ((totalAnualResultado/totalAnualVentas)*100).toFixed(1) : 0;
+
+  el.innerHTML = `
+    <div class="flex-between mb16">
+      <div style="font-size:13px;color:var(--text2)">Año ${state.anio} — ${state.empresaNombre}</div>
+      <button class="btn" onclick="window.print()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+        Imprimir / PDF
+      </button>
+    </div>
+
+    <div class="grid4 mb16">
+      <div class="metric"><div class="metric-label">Ventas año ${state.anio}</div><div class="metric-value green">${clp(totalAnualVentas)}</div></div>
+      <div class="metric"><div class="metric-label">Compras año ${state.anio}</div><div class="metric-value">${clp(totalAnualCompras)}</div></div>
+      <div class="metric"><div class="metric-label">Resultado anual</div><div class="metric-value ${totalAnualResultado>=0?'green':'red'}">${clp(totalAnualResultado)}</div></div>
+      <div class="metric"><div class="metric-label">Margen anual</div><div class="metric-value">${margenAnual}%</div></div>
+    </div>
+
+    <div class="card mb16">
+      <div class="card-header"><span class="card-title">Resumen mensual ${state.anio}</span></div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Mes</th><th class="td-num">Ventas</th><th class="td-num">Compras</th><th class="td-num">Honorarios</th><th class="td-num">Resultado</th><th class="td-num">IVA débito</th><th class="td-num">IVA crédito</th><th class="td-num">PPM</th></tr></thead>
+          <tbody>
+            ${resumen.map(r => `<tr>
+              <td><strong>${mesesFull[r.mes]}</strong></td>
+              <td class="td-num" style="color:var(--green)">${clp(r.ventas)}</td>
+              <td class="td-num">${clp(r.compras)}</td>
+              <td class="td-num">${r.hon > 0 ? clp(r.hon) : '—'}</td>
+              <td class="td-num" style="color:${r.resultado>=0?'var(--green)':'var(--red)'}"><strong>${clp(r.resultado)}</strong></td>
+              <td class="td-num">${clp(r.ivaDeb)}</td>
+              <td class="td-num" style="color:var(--green)">${clp(r.ivaCred)}</td>
+              <td class="td-num">${clp(r.ppm)}</td>
+            </tr>`).join('')}
+            <tr style="background:var(--bg);font-weight:700;border-top:2px solid var(--border)">
+              <td>TOTAL AÑO</td>
+              <td class="td-num" style="color:var(--green)">${clp(totalAnualVentas)}</td>
+              <td class="td-num">${clp(totalAnualCompras)}</td>
+              <td class="td-num">${clp(totalAnualHon)}</td>
+              <td class="td-num" style="color:${totalAnualResultado>=0?'var(--green)':'var(--red)'}"><strong>${clp(totalAnualResultado)}</strong></td>
+              <td class="td-num">${clp(totalAnualIvaDeb)}</td>
+              <td class="td-num" style="color:var(--green)">${clp(totalAnualIvaCred)}</td>
+              <td class="td-num">${clp(totalAnualPPM)}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="grid2" style="gap:16px">
+      <div class="card">
+        <div class="card-header"><span class="card-title">Resumen para Operación Renta</span></div>
+        <div class="card-body">
+          <div class="f29-row"><span class="f29-label">Ingresos brutos del año</span><span class="f29-value">${clp(totalAnualVentas)}</span></div>
+          <div class="f29-row"><span class="f29-label">Costos y gastos</span><span class="f29-value" style="color:var(--red)">− ${clp(totalAnualCompras + totalAnualHon)}</span></div>
+          <div class="f29-row" style="border-top:2px solid var(--border)"><span class="f29-label" style="font-weight:600">Renta líquida imponible</span><span class="f29-value" style="color:${totalAnualResultado>=0?'var(--green)':'var(--red)'}">${clp(Math.abs(totalAnualResultado))}</span></div>
+          <div class="f29-row"><span class="f29-label">PPM pagados en el año</span><span class="f29-value">${clp(totalAnualPPM)}</span></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header"><span class="card-title">IVA acumulado del año</span></div>
+        <div class="card-body">
+          <div class="f29-row"><span class="f29-label">IVA débito total</span><span class="f29-value">${clp(totalAnualIvaDeb)}</span></div>
+          <div class="f29-row"><span class="f29-label">IVA crédito total</span><span class="f29-value" style="color:var(--green)">${clp(totalAnualIvaCred)}</span></div>
+          <div class="f29-row" style="border-top:2px solid var(--border)"><span class="f29-label" style="font-weight:600">IVA neto pagado en el año</span><span class="f29-value">${clp(Math.max(0, totalAnualIvaDeb - totalAnualIvaCred))}</span></div>
+        </div>
+      </div>
+    </div>`;
+}
+
+// ─── ALERTA F29 ───────────────────────────────────────────────────
+function checkAlertaF29() {
+  const hoy = new Date();
+  const dia = hoy.getDate();
+  const mes = hoy.getMonth() + 1;
+  const anio = hoy.getFullYear();
+  if (dia >= 12 && dia <= 20) {
+    const meses = ['','Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+    const mesDec = mes === 1 ? 12 : mes - 1;
+    const anioDec = mes === 1 ? anio - 1 : anio;
+    const alerta = document.createElement('div');
+    alerta.style.cssText = 'position:fixed;bottom:20px;right:20px;background:#dc2626;color:#fff;padding:14px 18px;border-radius:10px;font-size:13px;font-weight:500;box-shadow:0 4px 20px rgba(220,38,38,0.4);z-index:999;cursor:pointer;max-width:280px';
+    alerta.innerHTML = `⚠️ Vence el 20 de ${meses[mes]}<br><span style="font-weight:400;font-size:12px">Declara el F29 de ${meses[mesDec]} ${anioDec}</span>`;
+    alerta.onclick = () => { navigate('f29'); alerta.remove(); };
+    document.body.appendChild(alerta);
+    setTimeout(() => alerta?.remove(), 15000);
+  }
+}
+
+// ─── EXPORTAR LIBROS A EXCEL ──────────────────────────────────────
+async function exportarLibroExcel(tipo) {
+  const periodoId = await getPeriodoIdSilent();
+  if (!periodoId) return showAlert('No hay datos para exportar en este período', 'error');
+  const meses = ['','Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  const label = `${meses[state.mes]}_${state.anio}`;
+
+  let csv = '', filename = '';
+  if (tipo === 'diario') {
+    const { data: asientos } = await sb.from('asientos').select('*, asiento_lineas(*, cuentas(codigo, nombre))').eq('empresa_id', state.empresaId).eq('periodo_id', periodoId).order('fecha');
+    csv = 'Fecha,Glosa,Origen,Cuenta,Nombre cuenta,Debe,Haber\n';
+    (asientos||[]).forEach(a => {
+      (a.asiento_lineas||[]).forEach(l => {
+        csv += `${a.fecha},"${a.glosa||''}",${a.origen||''},${l.cuentas?.codigo||''},"${l.cuentas?.nombre||''}",${l.debe||0},${l.haber||0}\n`;
+      });
+    });
+    filename = `libro_diario_${label}.csv`;
+  } else if (tipo === 'compras') {
+    const { data: docs } = await sb.from('rcv_documentos').select('*').eq('empresa_id', state.empresaId).eq('periodo_id', periodoId).eq('tipo_mov', 'compra').order('fecha_docto');
+    csv = 'Fecha,RUT,Proveedor,Folio,Neto,IVA,Total\n';
+    (docs||[]).forEach(r => { csv += `${r.fecha_docto||''},${r.rut_contraparte||''},"${r.razon_contraparte||''}",${r.folio||''},${r.monto_neto||0},${r.iva||0},${r.monto_total||0}\n`; });
+    filename = `libro_compras_${label}.csv`;
+  } else if (tipo === 'ventas') {
+    const { data: docs } = await sb.from('rcv_documentos').select('*').eq('empresa_id', state.empresaId).eq('periodo_id', periodoId).eq('tipo_mov', 'venta').order('fecha_docto');
+    csv = 'Fecha,RUT,Cliente,Folio,Neto,IVA,Total\n';
+    (docs||[]).forEach(r => { csv += `${r.fecha_docto||''},${r.rut_contraparte||''},"${r.razon_contraparte||''}",${r.folio||''},${r.monto_neto||0},${r.iva||0},${r.monto_total||0}\n`; });
+    filename = `libro_ventas_${label}.csv`;
+  }
+
+  const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  a.click();
+  showAlert(`Exportado: ${filename}`);
+}
+
 // ─── START ────────────────────────────────────────────────────────
 init();
+setTimeout(checkAlertaF29, 2000);
 </script>
 </body>
 </html>
