@@ -590,6 +590,8 @@ async function renderDashboard() {
     } catch(e) {}
   }
 }
+
+async function getPeriodoIdSilent() {
   if (!state.empresaId) return null;
   const { data } = await sb.from('periodos').select('id').eq('empresa_id', state.empresaId).eq('anio', state.anio).eq('mes', state.mes).single();
   return data?.id || null;
@@ -1100,8 +1102,6 @@ async function processRCV(file, tipoMov) {
       await sb.from('notas_credito').insert(ncData);
       ncGuardadas = docsNC.length;
     } catch(e) { /* tabla puede no existir aún */ }
-  }
-    return;
   }
 
   // Generar asientos automáticos
@@ -2528,9 +2528,7 @@ async function toggleF29(periodoId, declarado) {
   if (error) {
     // Si la columna no existe, la creamos
     if (error.message.includes('f29_declarado')) {
-      showAlert('Ejecuta este SQL en Supabase primero:
-ALTER TABLE periodos ADD COLUMN IF NOT EXISTS f29_declarado BOOLEAN DEFAULT false;
-ALTER TABLE periodos ADD COLUMN IF NOT EXISTS f29_fecha TEXT;', 'error');
+      showAlert('Ejecuta este SQL en Supabase: ALTER TABLE periodos ADD COLUMN IF NOT EXISTS f29_declarado BOOLEAN DEFAULT false; ALTER TABLE periodos ADD COLUMN IF NOT EXISTS f29_fecha TEXT;', 'error');
     } else {
       showAlert('Error: ' + error.message, 'error');
     }
