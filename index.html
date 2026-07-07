@@ -8,12 +8,9 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <style>
 @media print {
-  .sidebar, .topbar, .flex-between .flex, #page-title { display: none !important; }
-  .main { margin-left: 0 !important; }
-  .page { padding: 0 !important; }
-  .tab-panel { display: block !important; }
-  #page-reporte > .flex-between { display: none !important; }
-  #reporte-print { box-shadow: none !important; max-width: 100% !important; }
+  body * { visibility: hidden; }
+  #reporte-print, #reporte-print * { visibility: visible; }
+  #reporte-print { position: fixed; top: 0; left: 0; width: 100%; box-shadow: none !important; border-radius: 0 !important; }
   body { background: white !important; }
 }
   --bg: #f0f4f8;
@@ -2115,15 +2112,23 @@ function updateThinkingMsg(text) {
 }
 
 // ─── REPORTE CLIENTE ──────────────────────────────────────────────
-async function renderReporte() {
+async function renderReporte(mesReporte, anioReporte) {
   const el = document.getElementById('page-reporte');
   if (!requireEmpresa(el)) return;
+
+  // Usar período propio del reporte si se especifica, sino usar el del topbar
+  const mes = mesReporte || state.mes;
+  const anio = anioReporte || state.anio;
+
   el.innerHTML = `<div class="loading"><div class="spinner"></div> Preparando reporte...</div>`;
 
-  const periodoId = await getPeriodoIdSilent();
   const meses = ['','Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
-  const mesLabel = `${meses[state.mes]} ${state.anio}`;
+  const mesLabel = `${meses[mes]} ${anio}`;
   const emp = state.empresas.find(e => e.id === state.empresaId);
+
+  // Obtener período específico del reporte
+  const { data: periodoData } = await sb.from('periodos').select('id').eq('empresa_id', state.empresaId).eq('anio', anio).eq('mes', mes).single();
+  const periodoId = periodoData?.id || null;
 
   let ventas = [], compras = [], hons = [], ncs = [];
   if (periodoId) {
@@ -2133,6 +2138,9 @@ async function renderReporte() {
     const r4 = await sb.from('notas_credito').select('*').eq('empresa_id', state.empresaId).eq('periodo_id', periodoId);
     ventas = r1.data || []; compras = r2.data || []; hons = r3.data || []; ncs = r4.data || [];
   }
+  // Para cálculo de remanente usar mes/año del reporte
+  const _savedMes = state.mes, _savedAnio = state.anio;
+  state.mes = mes; state.anio = anio;
 
   const totalVentasNeto = ventas.reduce((s,r) => s + r.monto_neto, 0);
   const totalVentasTotal = ventas.reduce((s,r) => s + r.monto_total, 0);
@@ -2148,7 +2156,8 @@ async function renderReporte() {
   const totalHon = hons.reduce((s,h) => s + h.monto_bruto, 0);
   const totalRet = hons.reduce((s,h) => s + h.retencion, 0);
   const resultado = totalVentasNeto - totalComprasNeto - totalHon;
-  const remanteAnteriorRep = await calcularRemanteAcumulado(state.anio, state.mes);
+  const remanteAnteriorRep = await calcularRemanteAcumulado(anio, mes);
+  state.mes = _savedMes; state.anio = _savedAnio;
   const creditoTotal = ivaCredito + remanteAnteriorRep;
   const ivaPagar = Math.max(0, ivaDebitoNeto - creditoTotal);
   const remanente = creditoTotal > ivaDebitoNeto ? creditoTotal - ivaDebitoNeto : 0;
@@ -2164,7 +2173,17 @@ async function renderReporte() {
 
   el.innerHTML = `
     <div class="flex-between mb16">
-      <div style="font-size:13px;color:var(--text2)">Vista previa del reporte — ${mesLabel}</div>
+      <div class="flex gap8" style="align-items:center">
+        <span style="font-size:13px;color:var(--text2)">Período del reporte:</span>
+        <select onchange="renderReporte(parseInt(this.value.split('-')[1]),parseInt(this.value.split('-')[0]))" style="font-size:13px;padding:5px 8px;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface)">
+          ${(()=>{
+            const mArr=['','Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+            let opts='';
+            for(let y=2024;y<=2027;y++) for(let m=1;m<=12;m++) opts+=`<option value="${y}-${m}" ${y===anio&&m===mes?'selected':''}>${mArr[m]} ${y}</option>`;
+            return opts;
+          })()}
+        </select>
+      </div>
       <div class="flex gap8">
         <button class="btn" onclick="window.print()">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
