@@ -571,7 +571,8 @@ async function renderDashboard() {
   }
 
   const ivaPagar = Math.max(0, ivaDebito - ivaCredito);
-  const resultado = ventas - compras - honorarios;
+  const gastosM = await getGastosManual(periodoId);
+  const resultado = ventas - compras - honorarios - gastosM.total;
 
   el.innerHTML = `
     <div class="mb24">
@@ -640,6 +641,28 @@ async function getPeriodoIdSilent() {
   if (!state.empresaId) return null;
   const { data } = await sb.from('periodos').select('id').eq('empresa_id', state.empresaId).eq('anio', state.anio).eq('mes', state.mes).single();
   return data?.id || null;
+}
+
+async function getGastosManual(periodoId) {
+  // Obtiene gastos de asientos manuales (cuentas egreso 510xxx, excluye honorarios 510103)
+  if (!periodoId) return { total: 0, detalle: [] };
+  try {
+    const { data: asientos } = await sb.from('asientos').select('id').eq('empresa_id', state.empresaId).eq('periodo_id', periodoId).eq('origen', 'manual');
+    if (!asientos?.length) return { total: 0, detalle: [] };
+    const ids = asientos.map(a => a.id);
+    const { data: lineas } = await sb.from('asiento_lineas').select('debe, cuentas(codigo, nombre, tipo)').in('asiento_id', ids);
+    let total = 0;
+    const detalle = [];
+    (lineas || []).forEach(l => {
+      if (l.cuentas?.tipo === 'egreso' && l.cuentas?.codigo !== '510103' && (l.debe || 0) > 0) {
+        total += l.debe;
+        const ex = detalle.find(g => g.codigo === l.cuentas.codigo);
+        if (ex) ex.monto += l.debe;
+        else detalle.push({ codigo: l.cuentas.codigo, nombre: l.cuentas.nombre, monto: l.debe });
+      }
+    });
+    return { total, detalle };
+  } catch(e) { return { total: 0, detalle: [] }; }
 }
 
 // ─── EMPRESAS ─────────────────────────────────────────────────────
@@ -1815,7 +1838,10 @@ async function renderEERR() {
   const ingresos = Object.values(saldos).filter(s => s.tipo === 'ingreso');
   const egresos = Object.values(saldos).filter(s => s.tipo === 'egreso');
   const totalIngresos = ingresos.reduce((s, x) => s + x.haber, 0);
-  const totalEgresos = egresos.reduce((s, x) => s + x.debe, 0);
+  const totalEgresosRCV = egresos.reduce((s, x) => s + x.debe, 0);
+  // Agregar gastos manuales (arriendo, luz, agua, etc.)
+  const gastosM = await getGastosManual(periodoId);
+  const totalEgresos = totalEgresosRCV + gastosM.total;
   const utilidad = totalIngresos - totalEgresos;
   const pct = n => totalIngresos > 0 ? ((n / totalIngresos) * 100).toFixed(1) + '%' : '—';
 
@@ -1831,6 +1857,7 @@ async function renderEERR() {
         <div class="f29-row" style="border-top:2px solid var(--border);font-weight:700"><span>Total ingresos</span><span class="f29-value" style="color:var(--green)">${clp(totalIngresos)}</span></div>
         <div style="font-size:12px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.06em;margin:16px 0 10px">Egresos</div>
         ${egresos.map(e => `<div class="f29-row"><span class="f29-label">${e.codigo} — ${e.nombre}</span><div class="flex gap12"><span class="text-muted">${pct(e.debe)}</span><span class="f29-value" style="color:var(--red)">${clp(e.debe)}</span></div></div>`).join('')}
+        ${gastosM.detalle.map(g => `<div class="f29-row"><span class="f29-label">${g.codigo} — ${g.nombre}</span><div class="flex gap12"><span class="text-muted">${pct(g.monto)}</span><span class="f29-value" style="color:var(--red)">${clp(g.monto)}</span></div></div>`).join('')}
         <div class="f29-row" style="border-top:2px solid var(--border);font-weight:700"><span>Total egresos</span><span class="f29-value" style="color:var(--red)">${clp(totalEgresos)}</span></div>
         <div class="f29-total" style="margin-top:16px">
           <span class="f29-total-label">${utilidad >= 0 ? 'Utilidad' : 'Pérdida'} del período</span>
@@ -2186,14 +2213,34 @@ async function renderReporte(mesReporte, anioReporte) {
   const totalComprasTotal = compras.reduce((s,r) => s + r.monto_total, 0);
   const ivaDebito = ventas.reduce((s,r) => s + r.iva, 0);
   const ivaCreditoBruto = compras.reduce((s,r) => s + r.iva, 0);
-  // Restar NC recibidas (reducen crédito fiscal) y NC emitidas (reducen débito fiscal)
   const ncCompraIva = ncs.filter(n => n.tipo_mov === 'compra').reduce((s,n) => s + n.iva, 0);
   const ncVentaIva = ncs.filter(n => n.tipo_mov === 'venta').reduce((s,n) => s + n.iva, 0);
   const ivaCredito = ivaCreditoBruto - ncCompraIva;
   const ivaDebitoNeto = ivaDebito - ncVentaIva;
   const totalHon = hons.reduce((s,h) => s + h.monto_bruto, 0);
   const totalRet = hons.reduce((s,h) => s + h.retencion, 0);
-  const resultado = totalVentasNeto - totalComprasNeto - totalHon;
+
+  // Obtener gastos de asientos manuales (cuentas de egreso 510xxx)
+  let gastosManual = 0;
+  let detalleGastosManual = [];
+  if (periodoId) {
+    const { data: lineasManual } = await sb.from('asiento_lineas')
+      .select('debe, cuentas(codigo, nombre, tipo)')
+      .eq('asientos.empresa_id', state.empresaId)
+      .eq('asientos.periodo_id', periodoId)
+      .eq('asientos.origen', 'manual');
+    // Sumar solo cuentas de egreso (510xxx) que no sean honorarios (510103)
+    (lineasManual || []).forEach(l => {
+      if (l.cuentas?.tipo === 'egreso' && l.cuentas?.codigo !== '510103' && l.debe > 0) {
+        gastosManual += l.debe;
+        const existing = detalleGastosManual.find(g => g.codigo === l.cuentas.codigo);
+        if (existing) existing.monto += l.debe;
+        else detalleGastosManual.push({ codigo: l.cuentas.codigo, nombre: l.cuentas.nombre, monto: l.debe });
+      }
+    });
+  }
+
+  const resultado = totalVentasNeto - totalComprasNeto - totalHon - gastosManual;
   const remanteAnteriorRep = await calcularRemanteAcumulado(anio, mes);
   state.mes = _savedMes; state.anio = _savedAnio;
   const creditoTotal = ivaCredito + remanteAnteriorRep;
@@ -2203,8 +2250,9 @@ async function renderReporte(mesReporte, anioReporte) {
   const totalF29 = ivaPagar + ppm - totalRet;
   const margen = totalVentasNeto > 0 ? ((resultado / totalVentasNeto) * 100).toFixed(1) : 0;
 
-  // Bar chart widths
-  const maxVal = Math.max(totalVentasNeto, totalComprasNeto, totalHon, 1);
+  // Bar chart - include manual gastos in egresos
+  const totalEgresos = totalComprasNeto + totalHon + gastosManual;
+  const maxVal = Math.max(totalVentasNeto, totalEgresos, 1);
   const barV = Math.round((totalVentasNeto / maxVal) * 100);
   const barC = Math.round((totalComprasNeto / maxVal) * 100);
   const barH = Math.round((totalHon / maxVal) * 100);
@@ -2250,7 +2298,7 @@ async function renderReporte(mesReporte, anioReporte) {
           </div>
           <div style="background:rgba(255,255,255,0.15);border-radius:10px;padding:14px 20px;flex:1">
             <div style="font-size:11px;opacity:.7;margin-bottom:4px">EGRESOS DEL MES</div>
-            <div style="font-size:22px;font-weight:700">${clp(totalComprasNeto + totalHon)}</div>
+            <div style="font-size:22px;font-weight:700">${clp(totalEgresos)}</div>
           </div>
           <div style="background:rgba(255,255,255,${resultado >= 0 ? '0.2' : '0.1'});border-radius:10px;padding:14px 20px;flex:1;border:1px solid rgba(255,255,255,0.3)">
             <div style="font-size:11px;opacity:.7;margin-bottom:4px">RESULTADO</div>
@@ -2297,6 +2345,7 @@ async function renderReporte(mesReporte, anioReporte) {
             <div style="display:flex;justify-content:space-between;padding:10px 16px;border-bottom:1px solid #e2e8f0;font-size:13px"><span style="color:#475569">Ventas netas</span><span style="font-weight:500;color:#16a34a">${clp(totalVentasNeto)}</span></div>
             <div style="display:flex;justify-content:space-between;padding:10px 16px;border-bottom:1px solid #e2e8f0;font-size:13px"><span style="color:#475569">Compras / Costo</span><span style="color:#dc2626">− ${clp(totalComprasNeto)}</span></div>
             ${totalHon > 0 ? `<div style="display:flex;justify-content:space-between;padding:10px 16px;border-bottom:1px solid #e2e8f0;font-size:13px"><span style="color:#475569">Honorarios</span><span style="color:#dc2626">− ${clp(totalHon)}</span></div>` : ''}
+            ${detalleGastosManual.map(g => `<div style="display:flex;justify-content:space-between;padding:10px 16px;border-bottom:1px solid #e2e8f0;font-size:13px"><span style="color:#475569">${g.nombre}</span><span style="color:#dc2626">− ${clp(g.monto)}</span></div>`).join('')}
             <div style="display:flex;justify-content:space-between;padding:14px 16px;background:${resultado >= 0 ? '#f0fdf4' : '#fef2f2'};font-size:15px;font-weight:700">
               <span>${resultado >= 0 ? '✅ Utilidad del mes' : '⚠️ Pérdida del mes'}</span>
               <span style="color:${resultado >= 0 ? '#16a34a' : '#dc2626'}">${clp(Math.abs(resultado))}</span>
@@ -2782,10 +2831,14 @@ async function renderReporteAnual() {
     const ivaDeb = (v||[]).reduce((s,r) => s+r.iva, 0);
     const ivaCred = (c||[]).reduce((s,r) => s+r.iva, 0);
     const ppm = Math.round(ventas * (emp?.tasa_ppm||0.25) / 100);
-    const resultado = ventas - compras - hon;
+    const _sm = state.mes, _sa = state.anio;
+    state.mes = p.mes; state.anio = p.anio;
+    const gm = await getGastosManual(p.id);
+    state.mes = _sm; state.anio = _sa;
+    const resultado = ventas - compras - hon - gm.total;
     totalAnualVentas += ventas; totalAnualCompras += compras; totalAnualHon += hon;
     totalAnualIvaDeb += ivaDeb; totalAnualIvaCred += ivaCred; totalAnualPPM += ppm;
-    resumen.push({ mes: p.mes, ventas, compras, hon, ivaDeb, ivaCred, ppm, resultado });
+    resumen.push({ mes: p.mes, ventas, compras, hon, gastosM: gm.total, ivaDeb, ivaCred, ppm, resultado });
   }
 
   const totalAnualResultado = totalAnualVentas - totalAnualCompras - totalAnualHon;
