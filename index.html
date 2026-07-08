@@ -644,25 +644,39 @@ async function getPeriodoIdSilent() {
 }
 
 async function getGastosManual(periodoId) {
-  // Obtiene gastos de asientos manuales (cuentas egreso 510xxx, excluye honorarios 510103)
   if (!periodoId) return { total: 0, detalle: [] };
   try {
+    // 1. Obtener asientos manuales del período
     const { data: asientos } = await sb.from('asientos').select('id').eq('empresa_id', state.empresaId).eq('periodo_id', periodoId).eq('origen', 'manual');
     if (!asientos?.length) return { total: 0, detalle: [] };
     const ids = asientos.map(a => a.id);
-    const { data: lineas } = await sb.from('asiento_lineas').select('debe, cuentas(codigo, nombre, tipo)').in('asiento_id', ids);
+
+    // 2. Obtener líneas de esos asientos
+    const { data: lineas } = await sb.from('asiento_lineas').select('debe, cuenta_id').in('asiento_id', ids);
+    if (!lineas?.length) return { total: 0, detalle: [] };
+
+    // 3. Obtener cuentas de egreso involucradas
+    const cuentaIds = [...new Set(lineas.filter(l => (l.debe||0) > 0).map(l => l.cuenta_id))];
+    if (!cuentaIds.length) return { total: 0, detalle: [] };
+    const { data: cuentas } = await sb.from('cuentas').select('id, codigo, nombre, tipo').in('id', cuentaIds);
+
+    // 4. Cruzar y sumar solo egresos (excluir honorarios 510103)
     let total = 0;
     const detalle = [];
-    (lineas || []).forEach(l => {
-      if (l.cuentas?.tipo === 'egreso' && l.cuentas?.codigo !== '510103' && (l.debe || 0) > 0) {
-        total += l.debe;
-        const ex = detalle.find(g => g.codigo === l.cuentas.codigo);
-        if (ex) ex.monto += l.debe;
-        else detalle.push({ codigo: l.cuentas.codigo, nombre: l.cuentas.nombre, monto: l.debe });
-      }
+    lineas.forEach(l => {
+      if ((l.debe || 0) <= 0) return;
+      const cuenta = cuentas?.find(c => c.id === l.cuenta_id);
+      if (!cuenta || cuenta.tipo !== 'egreso' || cuenta.codigo === '510103') return;
+      total += l.debe;
+      const ex = detalle.find(g => g.codigo === cuenta.codigo);
+      if (ex) ex.monto += l.debe;
+      else detalle.push({ codigo: cuenta.codigo, nombre: cuenta.nombre, monto: l.debe });
     });
     return { total, detalle };
-  } catch(e) { return { total: 0, detalle: [] }; }
+  } catch(e) {
+    console.error('getGastosManual error:', e);
+    return { total: 0, detalle: [] };
+  }
 }
 
 // ─── EMPRESAS ─────────────────────────────────────────────────────
