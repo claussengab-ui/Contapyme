@@ -563,7 +563,7 @@ async function renderDashboard() {
     const { data: hon_data } = await sb.from('honorarios').select('monto_bruto, retencion').eq('empresa_id', state.empresaId).eq('periodo_id', periodoId);
     ventas = (ventas_data || []).reduce((s, r) => s + (r.monto_neto || 0), 0);
     ivaDebito = (ventas_data || []).reduce((s, r) => s + (r.iva || 0), 0);
-    compras = (compras_data || []).reduce((s, r) => s + (r.monto_neto || 0), 0);
+    compras = (compras_data || []).reduce((s, r) => s + (r.monto_neto || 0) + (r.monto_exento || 0), 0);
     ivaCredito = (compras_data || []).reduce((s, r) => s + (r.iva || 0), 0);
     honorarios = (hon_data || []).reduce((s, r) => s + (r.monto_bruto || 0), 0);
     const emp = state.empresas.find(e => e.id === state.empresaId);
@@ -1924,7 +1924,7 @@ async function renderHistorial() {
     const { data: hons } = await sb.from('honorarios').select('monto_bruto, retencion').eq('periodo_id', p.id);
     const { data: asientos } = await sb.from('asientos').select('id').eq('periodo_id', p.id);
 
-    const totalCompras = (rcvCompras||[]).reduce((s,r) => s + r.monto_total, 0);
+    const totalCompras = (rcvCompras||[]).reduce((s,r) => s + r.monto_total, 0);  // total ya incluye exento
     const totalVentas = (rcvVentas||[]).reduce((s,r) => s + r.monto_total, 0);
     const totalHon = (hons||[]).reduce((s,r) => s + r.monto_bruto, 0);
     const ivaDebito = (rcvVentas||[]).reduce((s,r) => s + r.iva, 0);
@@ -2223,7 +2223,7 @@ async function renderReporte(mesReporte, anioReporte) {
 
   const totalVentasNeto = ventas.reduce((s,r) => s + r.monto_neto, 0);
   const totalVentasTotal = ventas.reduce((s,r) => s + r.monto_total, 0);
-  const totalComprasNeto = compras.reduce((s,r) => s + r.monto_neto, 0);
+  const totalComprasNeto = compras.reduce((s,r) => s + (r.monto_neto||0) + (r.monto_exento||0), 0);
   const totalComprasTotal = compras.reduce((s,r) => s + r.monto_total, 0);
   const ivaDebito = ventas.reduce((s,r) => s + r.iva, 0);
   const ivaCreditoBruto = compras.reduce((s,r) => s + r.iva, 0);
@@ -2840,7 +2840,7 @@ async function renderReporteAnual() {
     const { data: c } = await sb.from('rcv_documentos').select('monto_neto, iva').eq('periodo_id', p.id).eq('tipo_mov', 'compra');
     const { data: h } = await sb.from('honorarios').select('monto_bruto, retencion').eq('periodo_id', p.id);
     const ventas = (v||[]).reduce((s,r) => s+r.monto_neto, 0);
-    const compras = (c||[]).reduce((s,r) => s+r.monto_neto, 0);
+    const compras = (c||[]).reduce((s,r) => s+(r.monto_neto||0)+(r.monto_exento||0), 0);
     const hon = (h||[]).reduce((s,r) => s+r.monto_bruto, 0);
     const ivaDeb = (v||[]).reduce((s,r) => s+r.iva, 0);
     const ivaCred = (c||[]).reduce((s,r) => s+r.iva, 0);
