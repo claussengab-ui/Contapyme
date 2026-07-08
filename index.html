@@ -48,6 +48,18 @@
   --sidebar-hover: rgba(255,255,255,0.06);
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
+
+/* Login screen */
+.login-screen { position: fixed; inset: 0; background: linear-gradient(135deg, #1e1b4b, #312e81, #4f46e5); display: flex; align-items: center; justify-content: center; z-index: 9999; }
+.login-card { background: #fff; border-radius: 16px; padding: 40px; width: 340px; box-shadow: 0 20px 60px rgba(0,0,0,0.3); text-align: center; }
+.login-logo { width: 56px; height: 56px; background: linear-gradient(135deg, #6366f1, #4f46e5); border-radius: 14px; display: flex; align-items: center; justify-content: center; font-size: 28px; margin: 0 auto 16px; }
+.login-title { font-size: 22px; font-weight: 700; color: #0f172a; margin-bottom: 4px; }
+.login-sub { font-size: 13px; color: #94a3b8; margin-bottom: 28px; }
+.login-input { width: 100%; padding: 11px 14px; font-size: 14px; border: 1.5px solid #e2e8f0; border-radius: 10px; outline: none; margin-bottom: 14px; text-align: center; letter-spacing: 3px; color: #0f172a; }
+.login-input:focus { border-color: #4f46e5; box-shadow: 0 0 0 3px #eef2ff; }
+.login-btn { width: 100%; padding: 11px; font-size: 14px; font-weight: 600; background: linear-gradient(135deg, #6366f1, #4f46e5); color: #fff; border: none; border-radius: 10px; cursor: pointer; transition: opacity 0.15s; }
+.login-btn:hover { opacity: 0.9; }
+.login-error { font-size: 12px; color: #dc2626; margin-top: 8px; min-height: 18px; }
 body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); font-size: 14px; line-height: 1.5; }
 
 /* Layout */
@@ -200,7 +212,21 @@ tr:hover td { background: #f8faff; }
 </head>
 <body>
 
-<div class="shell">
+<!-- LOGIN SCREEN -->
+<div class="login-screen" id="login-screen">
+  <div class="login-card">
+    <div class="login-logo">📊</div>
+    <div class="login-title">ContaPyme</div>
+    <div class="login-sub">Sistema contable chileno</div>
+    <input class="login-input" type="password" id="login-pwd" placeholder="••••••••" 
+      onkeydown="if(event.key==='Enter') checkLogin()"
+      autofocus>
+    <button class="login-btn" onclick="checkLogin()">Ingresar</button>
+    <div class="login-error" id="login-error"></div>
+  </div>
+</div>
+
+<div class="shell" id="app-shell" style="display:none">
   <!-- SIDEBAR -->
   <aside class="sidebar">
     <div class="sidebar-logo">
@@ -346,6 +372,8 @@ tr:hover td { background: #f8faff; }
     </div>
   </div>
 </div>
+
+</div><!-- end app-shell -->
 
 <!-- MODAL -->
 <div id="modal-overlay" class="modal-overlay hidden" onclick="closeModalOverlay(event)">
@@ -3112,9 +3140,43 @@ async function deleteNC(id) {
   renderNotasCredito();
 }
 
+// ─── LOGIN ────────────────────────────────────────────────────────
+const APP_PASSWORD = 'contapyme2026';
+
+function checkLogin() {
+  const pwd = document.getElementById('login-pwd').value;
+  const errorEl = document.getElementById('login-error');
+  if (pwd === APP_PASSWORD || pwd === localStorage.getItem('app_custom_pwd')) {
+    localStorage.setItem('app_session', btoa(Date.now().toString()));
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('app-shell').style.display = 'flex';
+    init();
+  } else {
+    errorEl.textContent = 'Contraseña incorrecta. Intenta de nuevo.';
+    document.getElementById('login-pwd').value = '';
+    document.getElementById('login-pwd').focus();
+    setTimeout(() => errorEl.textContent = '', 3000);
+  }
+}
+
+function checkSession() {
+  const session = localStorage.getItem('app_session');
+  if (session) {
+    const ts = parseInt(atob(session));
+    const horasTranscurridas = (Date.now() - ts) / (1000 * 60 * 60);
+    if (horasTranscurridas < 8) {
+      document.getElementById('login-screen').style.display = 'none';
+      document.getElementById('app-shell').style.display = 'flex';
+      init();
+      return;
+    }
+  }
+  document.getElementById('login-pwd').focus();
+}
+
 // ─── START ────────────────────────────────────────────────────────
-init();
-setTimeout(checkAlertaF29, 2000);
+checkSession();
+setTimeout(checkAlertaF29, 3000);
 </script>
 </body>
 </html>
