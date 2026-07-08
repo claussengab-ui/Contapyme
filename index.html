@@ -2449,7 +2449,7 @@ function drawPieChart(compras, totalHon) {
   const grouped = {};
   compras.forEach(c => {
     const key = (c.razon_contraparte || 'Otros').substring(0, 25);
-    grouped[key] = (grouped[key] || 0) + (c.monto_neto || 0);
+    grouped[key] = (grouped[key] || 0) + (c.monto_neto || 0) + (c.monto_exento || 0);
   });
   if (totalHon > 0) grouped['Honorarios'] = totalHon;
 
