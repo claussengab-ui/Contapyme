@@ -2261,7 +2261,7 @@ async function renderReporte(mesReporte, anioReporte) {
   const ivaPagar = Math.max(0, ivaDebitoNeto - creditoTotal);
   const remanente = creditoTotal > ivaDebitoNeto ? creditoTotal - ivaDebitoNeto : 0;
   const ppm = Math.round(totalVentasNeto * (emp?.tasa_ppm || 0.25) / 100);
-  const totalF29 = ivaPagar + ppm - totalRet;
+  const totalF29 = ivaPagar + ppm + totalRet;
   const margen = totalVentasNeto > 0 ? ((resultado / totalVentasNeto) * 100).toFixed(1) : 0;
 
   // Bar chart - include manual gastos in egresos
@@ -2378,7 +2378,7 @@ async function renderReporte(mesReporte, anioReporte) {
             ${ncCompraIva > 0 ? `<div style="display:flex;justify-content:space-between;padding:10px 16px;border-bottom:1px solid #e2e8f0;font-size:13px;background:#fff7ed"><span style="color:#92400e">NC recibidas (reduce crédito)</span><span style="color:#92400e">+ ${clp(ncCompraIva)} → crédito neto: ${clp(ivaCredito)}</span></div>` : ''}
             ${remanteAnteriorRep > 0 ? `<div style="display:flex;justify-content:space-between;padding:10px 16px;border-bottom:1px solid #e2e8f0;font-size:13px;background:#eff6ff"><span style="color:#2563eb">Remanente IVA meses anteriores</span><span style="color:#2563eb">− ${clp(remanteAnteriorRep)}</span></div>` : ''}
             <div style="display:flex;justify-content:space-between;padding:10px 16px;border-bottom:1px solid #e2e8f0;font-size:13px"><span style="color:#475569">PPM (${emp?.tasa_ppm || 0.25}%)</span><span>${clp(ppm)}</span></div>
-            ${totalRet > 0 ? `<div style="display:flex;justify-content:space-between;padding:10px 16px;border-bottom:1px solid #e2e8f0;font-size:13px"><span style="color:#475569">Retenciones honorarios</span><span style="color:#16a34a">− ${clp(totalRet)}</span></div>` : ''}
+            ${totalRet > 0 ? `<div style="display:flex;justify-content:space-between;padding:10px 16px;border-bottom:1px solid #e2e8f0;font-size:13px"><span style="color:#475569">Retenciones honorarios</span><span style="color:#dc2626">+ ${clp(totalRet)}</span></div>` : ''}
             ${remanente > 0 ? `<div style="display:flex;justify-content:space-between;padding:10px 16px;border-bottom:1px solid #e2e8f0;font-size:13px;background:#eff6ff"><span style="color:#2563eb">Remanente que se arrastra</span><span style="color:#2563eb">${clp(remanente)}</span></div>` : ''}
             <div style="display:flex;justify-content:space-between;padding:14px 16px;background:${totalF29 > 0 ? '#fef2f2' : '#f0fdf4'};font-size:15px;font-weight:700">
               <span>${totalF29 > 0 ? '💳 Total a pagar F29' : '✅ Saldo a favor'}</span>
@@ -2555,7 +2555,7 @@ async function renderF29() {
   const creditoTotal = ivaCredito + remanteAnterior;
   const ivaAPagar = Math.max(0, ivaDebito - creditoTotal);
   const remanenteNuevo = creditoTotal > ivaDebito ? creditoTotal - ivaDebito : 0;
-  const totalF29 = ivaAPagar + ppm - retenciones;
+  const totalF29 = ivaAPagar + ppm + retenciones;
   const meses = ['','Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 
   el.innerHTML = `
@@ -2577,7 +2577,7 @@ async function renderF29() {
           <div class="card-body">
             <div class="f29-row"><span class="f29-label">Ventas netas</span><span class="f29-value">${clp(ventasNetas)}</span></div>
             <div class="f29-row"><span class="f29-label">Tasa PPM (${tasaPPM}%)</span><span class="f29-value">${clp(ppm)}</span></div>
-            <div class="f29-row"><span class="f29-label">Retenciones honorarios</span><span class="f29-value" style="color:var(--green)">− ${clp(retenciones)}</span></div>
+            <div class="f29-row"><span class="f29-label">Retenciones honorarios</span><span class="f29-value" style="color:var(--red)">+ ${clp(retenciones)}</span></div>
           </div>
         </div>
       </div>
@@ -2587,7 +2587,7 @@ async function renderF29() {
           <div class="card-body">
             <div class="f29-row"><span class="f29-label">IVA a pagar</span><span class="f29-value">${clp(ivaAPagar)}</span></div>
             <div class="f29-row"><span class="f29-label">PPM</span><span class="f29-value">${clp(ppm)}</span></div>
-            <div class="f29-row"><span class="f29-label">Retenciones 2da categoría</span><span class="f29-value" style="color:var(--green)">− ${clp(retenciones)}</span></div>
+            <div class="f29-row"><span class="f29-label">Retenciones 2da categoría</span><span class="f29-value" style="color:var(--red)">+ ${clp(retenciones)}</span></div>
             <div class="f29-total">
               <span class="f29-total-label">Total F29</span>
               <span class="f29-total-value" style="color:${totalF29 >= 0 ? 'var(--red)' : 'var(--green)'}">${clp(Math.abs(totalF29))}</span>
