@@ -8,6 +8,11 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <style>
 @media print {
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    color-adjust: exact !important;
+  }
   body * { visibility: hidden !important; }
   #reporte-print * { visibility: visible !important; }
   #reporte-print {
@@ -1041,8 +1046,8 @@ async function processRCVResumen(file) {
   document.getElementById('year-select').value = anioDetectado;
   state.mes = mesDetectado; state.anio = anioDetectado;
 
-  // Borrar ventas anteriores del período
-  await sb.from('rcv_documentos').delete().eq('empresa_id', state.empresaId).eq('periodo_id', periodoId).eq('tipo_mov', 'venta');
+  // Borrar SOLO el resumen anterior del período (no tocar las facturas/boletas de detalle)
+  await sb.from('rcv_documentos').delete().eq('empresa_id', state.empresaId).eq('periodo_id', periodoId).eq('tipo_mov', 'venta').eq('rut_contraparte', 'RESUMEN');
 
   // Insertar una línea por cada tipo de documento del resumen
   const insertData = tipos.map(t => ({
@@ -1157,8 +1162,12 @@ async function processRCV(file, tipoMov) {
     periodoId = await getOrCreatePeriodo();
   }
 
-  // Eliminar los del mismo periodo y tipo antes de insertar
-  await sb.from('rcv_documentos').delete().eq('empresa_id', state.empresaId).eq('periodo_id', periodoId).eq('tipo_mov', tipoMov);
+  // Eliminar los del mismo periodo y tipo antes de insertar (sin tocar el resumen de boletas/vouchers si es venta)
+  {
+    let delQuery = sb.from('rcv_documentos').delete().eq('empresa_id', state.empresaId).eq('periodo_id', periodoId).eq('tipo_mov', tipoMov);
+    if (tipoMov === 'venta') delQuery = delQuery.neq('rut_contraparte', 'RESUMEN');
+    await delQuery;
+  }
 
   // Insertar solo documentos normales (sin NC)
   const insertData = docsNormales.map(d => {
