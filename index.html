@@ -1017,6 +1017,7 @@ async function processRCVResumen(file) {
   let totalNeto = 0, totalIVA = 0, totalTotal = 0, totalDocs = 0;
   const tipos = [];
 
+  let omitidos = [];
   for (let i = 1; i < lines.length; i++) {
     const row = lines[i].split(sep);
     if (row.length < 4) continue;
@@ -1027,6 +1028,12 @@ async function processRCVResumen(file) {
     const total = parseFloat(get(row, 'Monto Total')) || 0;
     const exento = parseFloat(get(row, 'Monto Exento')) || 0;
     if (!tipoDoc) continue;
+    // El resumen del SII trae TODOS los tipos de documento del período, incluidas las facturas.
+    // Las facturas ya se cargan (con su detalle e IVA crédito de terceros) desde "Detalle",
+    // así que aquí solo tomamos boletas y comprobantes de pago electrónico (voucher/POS)
+    // para no duplicar el IVA débito ni la base del PPM.
+    const esVoucher = /boleta|comprobante|vale\s*de\s*m[aá]quina/i.test(tipoDoc);
+    if (!esVoucher) { omitidos.push(tipoDoc); continue; }
     totalNeto += neto; totalIVA += iva; totalTotal += total; totalDocs += ndocs;
     tipos.push({ tipoDoc, ndocs, neto, iva, total, exento });
   }
@@ -1241,8 +1248,10 @@ async function generarAsientosRCV(docs, periodoId, tipoMov) {
   const getCuenta = (codigo) => state.cuentas.find(c => c.codigo === codigo)?.id;
   const fecha = `${state.anio}-${String(state.mes).padStart(2,'0')}-28`;
 
-  // Borrar asientos anteriores de RCV del mismo periodo y tipo
-  const { data: viejos } = await sb.from('asientos').select('id').eq('empresa_id', state.empresaId).eq('periodo_id', periodoId).eq('origen', 'rcv');
+  // Borrar SOLO el asiento de centralización RCV anterior del MISMO tipo (compra o venta),
+  // sin tocar el asiento del otro tipo de movimiento del mismo período.
+  const glosaFiltro = tipoMov === 'compra' ? 'Compras' : 'Ventas';
+  const { data: viejos } = await sb.from('asientos').select('id').eq('empresa_id', state.empresaId).eq('periodo_id', periodoId).eq('origen', 'rcv').ilike('glosa', `%${glosaFiltro}%`);
   if (viejos?.length) {
     const ids = viejos.map(a => a.id);
     await sb.from('asiento_lineas').delete().in('asiento_id', ids);
