@@ -2442,6 +2442,66 @@ async function renderReporte(mesReporte, anioReporte) {
           </div>
         </div>` : ''}
 
+        <!-- DETALLE VENTAS -->
+        ${ventas.length > 0 ? `<div style="margin-bottom:28px">
+          <div style="font-size:14px;font-weight:600;margin-bottom:4px;color:#1e293b">📋 Detalle facturas de venta</div>
+          <div style="font-size:12px;color:#94a3b8;margin-bottom:12px">Facturas emitidas a clientes en el período</div>
+          <div style="border:1px solid #e2e8f0;border-radius:10px;overflow:hidden">
+            <table style="width:100%;border-collapse:collapse;font-size:12px">
+              <thead><tr style="background:#f8fafc">
+                <th style="padding:8px 12px;text-align:left;color:#64748b;font-weight:500">Fecha</th>
+                <th style="padding:8px 12px;text-align:left;color:#64748b;font-weight:500">Cliente</th>
+                <th style="padding:8px 12px;text-align:left;color:#64748b;font-weight:500">RUT</th>
+                <th style="padding:8px 12px;text-align:left;color:#64748b;font-weight:500">Tipo</th>
+                <th style="padding:8px 12px;text-align:right;color:#64748b;font-weight:500">Neto</th>
+                <th style="padding:8px 12px;text-align:right;color:#64748b;font-weight:500">IVA</th>
+                <th style="padding:8px 12px;text-align:right;color:#64748b;font-weight:500">Total</th>
+              </tr></thead>
+              <tbody>
+                ${(() => {
+                  const facturas = ventas.filter(r => r.tipo_doc === 33 || r.tipo_doc === 34);
+                  const boletas = ventas.filter(r => r.tipo_doc !== 33 && r.tipo_doc !== 34);
+                  const tipoLabel = t => t === 33 ? 'Factura' : t === 34 ? 'Fact. Exenta' : t === 39 ? 'Boleta' : t === 41 ? 'Boleta Exenta' : t === 48 ? 'Comp. Pago' : 'Tipo ' + t;
+                  const totalBoletasNeto = boletas.reduce((s,r) => s+(r.monto_neto||0)+(r.monto_exento||0), 0);
+                  const totalBoletasIva = boletas.reduce((s,r) => s+(r.iva||0), 0);
+                  const totalBoletasTotal = boletas.reduce((s,r) => s+(r.monto_total||0), 0);
+                  let rows = facturas.sort((a,b) => (a.fecha_docto||'').localeCompare(b.fecha_docto||'')).map(r =>
+                    '<tr style="border-top:1px solid #f1f5f9">' +
+                    '<td style="padding:8px 12px;color:#94a3b8">' + (r.fecha_docto||'—') + '</td>' +
+                    '<td style="padding:8px 12px;color:#334155;font-weight:500">' + (r.razon_contraparte||'—') + '</td>' +
+                    '<td style="padding:8px 12px;color:#94a3b8">' + (r.rut_contraparte||'—') + '</td>' +
+                    '<td style="padding:8px 12px"><span style="background:#eff6ff;color:#2563eb;padding:2px 6px;border-radius:4px;font-size:11px">' + tipoLabel(r.tipo_doc) + '</span></td>' +
+                    '<td style="padding:8px 12px;text-align:right;color:#334155">' + clp((r.monto_neto||0)+(r.monto_exento||0)) + '</td>' +
+                    '<td style="padding:8px 12px;text-align:right;color:#334155">' + clp(r.iva) + '</td>' +
+                    '<td style="padding:8px 12px;text-align:right;font-weight:500;color:#16a34a">' + clp(r.monto_total) + '</td>' +
+                    '</tr>'
+                  ).join('');
+                  if (boletas.length > 0) {
+                    rows += '<tr style="border-top:2px dashed #e2e8f0;background:#fafafa">' +
+                    '<td style="padding:8px 12px;color:#94a3b8">—</td>' +
+                    '<td style="padding:8px 12px;color:#475569;font-style:italic">Boletas de venta (' + boletas.length + ' documentos)</td>' +
+                    '<td style="padding:8px 12px;color:#94a3b8">—</td>' +
+                    '<td style="padding:8px 12px"><span style="background:#f0fdf4;color:#16a34a;padding:2px 6px;border-radius:4px;font-size:11px">Boletas</span></td>' +
+                    '<td style="padding:8px 12px;text-align:right;color:#334155">' + clp(totalBoletasNeto) + '</td>' +
+                    '<td style="padding:8px 12px;text-align:right;color:#334155">' + clp(totalBoletasIva) + '</td>' +
+                    '<td style="padding:8px 12px;text-align:right;font-weight:500;color:#16a34a">' + clp(totalBoletasTotal) + '</td>' +
+                    '</tr>';
+                  }
+                  return rows;
+                })()}
+              </tbody>
+              <tfoot>
+                <tr style="background:#ecfdf5;border-top:2px solid #6ee7b7">
+                  <td colspan="4" style="padding:10px 12px;font-weight:700;color:#065f46">Total ventas del mes</td>
+                  <td style="padding:10px 12px;text-align:right;font-weight:600;color:#065f46">${clp(totalVentasNeto)}</td>
+                  <td style="padding:10px 12px;text-align:right;font-weight:600;color:#065f46">${clp(ivaDebito)}</td>
+                  <td style="padding:10px 12px;text-align:right;font-weight:700;color:#065f46">${clp(totalVentasTotal)}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>` : ''}
+
         <!-- PIE -->
         <div style="border-top:1px solid #e2e8f0;padding-top:16px;display:flex;justify-content:space-between;align-items:center">
           <div style="font-size:11px;color:#94a3b8">Generado por ContaPyme · ${new Date().toLocaleDateString('es-CL')} · Período ${mesLabel}</div>
